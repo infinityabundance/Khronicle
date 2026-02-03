@@ -7,5 +7,5 @@ int main(int argc, char *argv[])
 
     qInfo() << "Khronicle daemon starting...";
 
-    return app.exec();
+    return 0;
 }
