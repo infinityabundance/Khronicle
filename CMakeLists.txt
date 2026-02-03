@@ -14,6 +14,7 @@ add_executable(khronicle-daemon
     src/daemon/main.cpp
     src/daemon/khronicle_store.cpp
     src/daemon/pacman_parser.cpp
+    src/daemon/journal_parser.cpp
 )
 
 target_include_directories(khronicle-daemon
