@@ -12,6 +12,8 @@
 
 namespace khronicle {
 
+class KhronicleApiServer;
+
 /**
  * KhronicleDaemon coordinates:
  * - periodic parsing of pacman.log and systemd journal
@@ -44,6 +46,7 @@ private:
     void loadLastSnapshotFromStore();
 
     std::unique_ptr<KhronicleStore> m_store;
+    std::unique_ptr<KhronicleApiServer> m_apiServer;
 
     // In-memory cached state for faster access between cycles.
     std::optional<std::string> m_pacmanCursor;

@@ -16,6 +16,7 @@ add_executable(khronicle-daemon
     src/daemon/pacman_parser.cpp
     src/daemon/journal_parser.cpp
     src/daemon/snapshot_builder.cpp
+    src/daemon/khronicle_api_server.cpp
     src/daemon/khronicle_daemon.cpp
 )
 
@@ -34,6 +35,7 @@ target_link_libraries(khronicle-daemon
 
 add_executable(khronicle
     src/ui/main.cpp
+    src/ui/backend/KhronicleApiClient.cpp
 )
 
 target_include_directories(khronicle

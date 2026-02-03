@@ -1,7 +1,10 @@
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#include <QQmlContext>
 #include <QQuickStyle>
+
+#include "ui/backend/KhronicleApiClient.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -10,6 +13,9 @@ int main(int argc, char *argv[])
     QQuickStyle::setStyle(QStringLiteral("org.kde.desktop"));
 
     QQmlApplicationEngine engine;
+    khronicle::KhronicleApiClient apiClient;
+    engine.rootContext()->setContextProperty(QStringLiteral("khronicleApi"),
+                                             &apiClient);
     const QUrl url = QUrl::fromLocalFile(
         QStringLiteral(KHRONICLE_QML_DIR "/Main.qml"));
 

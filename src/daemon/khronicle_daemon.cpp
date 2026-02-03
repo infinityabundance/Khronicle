@@ -5,6 +5,7 @@
 
 #include <QTimer>
 
+#include "daemon/khronicle_api_server.hpp"
 #include "daemon/journal_parser.hpp"
 #include "daemon/pacman_parser.hpp"
 #include "daemon/snapshot_builder.hpp"
@@ -69,6 +70,11 @@ KhronicleDaemon::~KhronicleDaemon() = default;
 
 void KhronicleDaemon::start()
 {
+    if (!m_apiServer) {
+        m_apiServer = std::make_unique<KhronicleApiServer>(*m_store);
+        m_apiServer->start();
+    }
+
     auto *timer = new QTimer(this);
     timer->setInterval(kIngestionIntervalMs);
     connect(timer, &QTimer::timeout, this, &KhronicleDaemon::runIngestionCycle);
