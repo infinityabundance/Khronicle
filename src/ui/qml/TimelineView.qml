@@ -10,8 +10,8 @@ Item {
     Kirigami.PlaceholderMessage {
         anchors.centerIn: parent
         visible: !(root.events && root.events.length > 0)
-        text: "No events in this period."
-        explanation: "Adjust the time range or try again later."
+        text: "No events matching the current filters."
+        explanation: "Try changing the categories or date range."
     }
 
     ListView {

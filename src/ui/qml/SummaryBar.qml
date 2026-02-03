@@ -5,6 +5,7 @@ import org.kde.kirigami as Kirigami
 Item {
     id: root
     property var summary: ({})
+    property string rangeLabel: ""
 
     implicitHeight: contentCard.implicitHeight
     implicitWidth: contentCard.implicitWidth
@@ -19,7 +20,14 @@ Item {
 
             Kirigami.Heading {
                 level: 3
-                text: "Since yesterday"
+                text: "Summary"
+            }
+
+            Kirigami.Label {
+                visible: root.rangeLabel && root.rangeLabel.length > 0
+                text: "Range: " + root.rangeLabel
+                opacity: 0.7
+                font.pointSize: Kirigami.Theme.defaultFont.pointSize * 0.9
             }
 
             Kirigami.Label {
