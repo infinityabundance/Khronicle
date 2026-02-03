@@ -13,11 +13,13 @@ find_package(SQLite3 REQUIRED)
 add_executable(khronicle-daemon
     src/daemon/main.cpp
     src/daemon/khronicle_store.cpp
+    src/daemon/pacman_parser.cpp
 )
 
 target_include_directories(khronicle-daemon
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common
 )
 
 target_link_libraries(khronicle-daemon
@@ -34,6 +36,7 @@ add_executable(khronicle
 target_include_directories(khronicle
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common
 )
 
 target_compile_definitions(khronicle
