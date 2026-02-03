@@ -59,3 +59,21 @@ target_link_libraries(khronicle
         Qt6::Kirigami2
         nlohmann_json::nlohmann_json
 )
+
+add_executable(khronicle-tray
+    src/tray/main.cpp
+    src/tray/KhronicleTray.cpp
+)
+
+target_include_directories(khronicle-tray
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common
+)
+
+target_link_libraries(khronicle-tray
+    PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
+)
