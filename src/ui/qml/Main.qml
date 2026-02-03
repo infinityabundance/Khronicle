@@ -11,6 +11,8 @@ Kirigami.ApplicationWindow {
 
     property var eventsModel: []
     property var summaryData: ({})
+    property var snapshotsModel: []
+    property var diffModel: []
 
     Component.onCompleted: {
         khronicleApi.connectToDaemon()
@@ -21,6 +23,7 @@ Kirigami.ApplicationWindow {
 
         khronicleApi.loadSummarySince(yesterday)
         khronicleApi.loadChangesBetween(weekAgo, now)
+        khronicleApi.loadSnapshots()
     }
 
     Connections {
@@ -30,6 +33,12 @@ Kirigami.ApplicationWindow {
         }
         function onChangesLoaded(events) {
             root.eventsModel = events
+        }
+        function onSnapshotsLoaded(snapshots) {
+            root.snapshotsModel = snapshots
+        }
+        function onDiffLoaded(diffRows) {
+            root.diffModel = diffRows
         }
         function onErrorOccurred(message) {
             console.warn("Khronicle API error:", message)
@@ -52,6 +61,20 @@ Kirigami.ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 events: root.eventsModel
+            }
+
+            SnapshotSelector {
+                Layout.fillWidth: true
+                snapshots: root.snapshotsModel
+                onCompareRequested: function(snapshotAId, snapshotBId) {
+                    khronicleApi.loadDiff(snapshotAId, snapshotBId)
+                }
+            }
+
+            DiffView {
+                Layout.fillWidth: true
+                diffRows: root.diffModel
+                visible: root.diffModel && root.diffModel.length > 0
             }
         }
     }
