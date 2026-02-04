@@ -84,10 +84,10 @@ void RiskClassifierTests::testRiskThresholds()
 
     engine.evaluateEvent(event);
 
-    const auto signals = store.getWatchSignalsSince(
+    const auto watchSignals = store.getWatchSignalsSince(
         std::chrono::system_clock::time_point{});
-    QCOMPARE(signals.size(), static_cast<size_t>(1));
-    QCOMPARE(QString::fromStdString(signals.front().ruleId),
+    QCOMPARE(watchSignals.size(), static_cast<size_t>(1));
+    QCOMPARE(QString::fromStdString(watchSignals.front().ruleId),
              QStringLiteral("rule-important"));
 }
 

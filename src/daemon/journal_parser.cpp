@@ -145,7 +145,7 @@ JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since
                QStringLiteral("journalctl"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"since", toIsoSince(since).toStdString()}});
+               (nlohmann::json{{"since", toIsoSince(since).toStdString()}}));
     process.start(QStringLiteral("journalctl"),
                   {sinceArg, QStringLiteral("--output=short-iso")});
 
@@ -191,7 +191,7 @@ JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since
                   QStringLiteral("journalctl"),
                   khronicle::logging::defaultWho(),
                   QString(),
-                  nlohmann::json{{"exitCode", process.exitCode()}});
+                  (nlohmann::json{{"exitCode", process.exitCode()}}));
         return result;
     }
 
@@ -308,9 +308,9 @@ JournalParseResult parseJournalOutputLines(const QStringList &lines,
               QStringLiteral("journalctl"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"lines", processed},
+              (nlohmann::json{{"lines", processed},
                              {"events", produced},
-                             {"lastTimestamp", toIso8601Utc(result.lastTimestamp)}});
+                             {"lastTimestamp", toIso8601Utc(result.lastTimestamp)}}));
     return result;
 }
 

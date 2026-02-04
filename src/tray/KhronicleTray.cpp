@@ -3,6 +3,7 @@
 #include <QAction>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLocalSocket>
@@ -341,9 +342,9 @@ int KhronicleTray::requestCriticalWatchSignalsSinceToday()
     }
 
     const QJsonObject result = obj.value("result").toObject();
-    const QJsonArray signals = result.value("signals").toArray();
+    const QJsonArray watchSignals = result.value("signals").toArray();
     int count = 0;
-    for (const auto &value : signals) {
+    for (const auto &value : watchSignals) {
         const QJsonObject signal = value.toObject();
         if (signal.value("severity").toString() == QStringLiteral("critical")) {
             count++;
@@ -400,15 +401,15 @@ QString KhronicleTray::requestWatchSignalsSinceToday()
     }
 
     const QJsonObject result = obj.value("result").toObject();
-    const QJsonArray signals = result.value("signals").toArray();
-    if (signals.isEmpty()) {
+    const QJsonArray watchSignals = result.value("signals").toArray();
+    if (watchSignals.isEmpty()) {
         return QStringLiteral("No watchpoint signals today");
     }
 
     QStringList lines;
     const int maxSignals = 5;
-    for (int i = signals.size() - 1; i >= 0 && lines.size() < maxSignals; --i) {
-        const QJsonObject signal = signals.at(i).toObject();
+    for (int i = watchSignals.size() - 1; i >= 0 && lines.size() < maxSignals; --i) {
+        const QJsonObject signal = watchSignals.at(i).toObject();
         const QString timestamp = signal.value("timestamp").toString();
         const QDateTime when = QDateTime::fromString(timestamp, Qt::ISODate);
         const QString timeLabel = when.isValid()

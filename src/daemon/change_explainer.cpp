@@ -20,8 +20,8 @@ std::string explainChange(const KhronicleDiff &diff,
                QStringLiteral("summary"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"eventCount", events.size()},
-                              {"changedFields", diff.changedFields.size()}});
+               (nlohmann::json{{"eventCount", events.size()},
+                              {"changedFields", diff.changedFields.size()}}));
     bool kernelChange = false;
     bool gpuChange = false;
     bool firmwareChange = false;
@@ -81,7 +81,7 @@ std::string explainChange(const KhronicleDiff &diff,
                   QStringLiteral("summary"),
                   khronicle::logging::defaultWho(),
                   QString(),
-                  nlohmann::json{{"highlights", 0}});
+                  (nlohmann::json{{"highlights", 0}}));
         return "No significant kernel, GPU, or firmware changes were detected during this interval.";
     }
 
@@ -103,7 +103,7 @@ std::string explainChange(const KhronicleDiff &diff,
               QStringLiteral("summary"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"highlights", highlights.size()}});
+              (nlohmann::json{{"highlights", highlights.size()}}));
     return summary.str();
 }
 

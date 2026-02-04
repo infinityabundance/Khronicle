@@ -166,10 +166,10 @@ void StoreTests::testWatchRulesAndSignals()
     signal.message = "matched";
     store.addWatchSignal(signal);
 
-    const auto signals = store.getWatchSignalsSince(
+    const auto watchSignals = store.getWatchSignalsSince(
         std::chrono::system_clock::time_point{});
-    QCOMPARE(signals.size(), static_cast<size_t>(1));
-    QCOMPARE(QString::fromStdString(signals.front().ruleId), QStringLiteral("rule-1"));
+    QCOMPARE(watchSignals.size(), static_cast<size_t>(1));
+    QCOMPARE(QString::fromStdString(watchSignals.front().ruleId), QStringLiteral("rule-1"));
 }
 
 QTEST_MAIN(StoreTests)

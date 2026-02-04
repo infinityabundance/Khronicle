@@ -86,7 +86,7 @@ void KhronicleDaemon::start()
               QStringLiteral("timer_loop"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"intervalMs", kIngestionIntervalMs}});
+              (nlohmann::json{{"intervalMs", kIngestionIntervalMs}}));
 
     // Timer-driven ingestion loop: keep work bounded and predictable.
     auto *timer = new QTimer(this);
@@ -115,7 +115,7 @@ void KhronicleDaemon::runIngestionCycle()
               QStringLiteral("bounded_batch"),
               khronicle::logging::defaultWho(),
               corrId,
-              nlohmann::json{{"cycleIndex", cycleIndex}});
+              (nlohmann::json{{"cycleIndex", cycleIndex}}));
 
     if (ScenarioCapture::isEnabled()) {
         ScenarioCapture::recordStep(nlohmann::json{
@@ -138,7 +138,7 @@ void KhronicleDaemon::runIngestionCycle()
               QStringLiteral("bounded_batch"),
               khronicle::logging::defaultWho(),
               corrId,
-              nlohmann::json{{"durationMs", elapsedMs}});
+              (nlohmann::json{{"durationMs", elapsedMs}}));
 }
 
 void KhronicleDaemon::runIngestionCycleForReplay()
@@ -158,8 +158,8 @@ void KhronicleDaemon::runPacmanIngestion()
                QStringLiteral("parse_log"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"cursor", m_pacmanCursor.value_or("")},
-                              {"path", logPath}});
+               (nlohmann::json{{"cursor", m_pacmanCursor.value_or("")},
+                              {"path", logPath}}));
     const PacmanParseResult result =
         parsePacmanLog(logPath, m_pacmanCursor);
 
@@ -185,8 +185,8 @@ void KhronicleDaemon::runPacmanIngestion()
               QStringLiteral("parse_log"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"events", ingested},
-                             {"newCursor", result.newCursor}});
+              (nlohmann::json{{"events", ingested},
+                             {"newCursor", result.newCursor}}));
 }
 
 void KhronicleDaemon::runJournalIngestion()
@@ -199,7 +199,7 @@ void KhronicleDaemon::runJournalIngestion()
                QStringLiteral("journalctl"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"since", toIso8601Utc(m_journalLastTimestamp)}});
+               (nlohmann::json{{"since", toIso8601Utc(m_journalLastTimestamp)}}));
     const JournalParseResult result = parseJournalSince(m_journalLastTimestamp);
 
     const std::string hostId = m_store->getHostIdentity().hostId;
@@ -224,8 +224,8 @@ void KhronicleDaemon::runJournalIngestion()
               QStringLiteral("journalctl"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"events", ingested},
-                             {"lastTimestamp", toIso8601Utc(result.lastTimestamp)}});
+              (nlohmann::json{{"events", ingested},
+                             {"lastTimestamp", toIso8601Utc(result.lastTimestamp)}}));
 }
 
 void KhronicleDaemon::runSnapshotCheck()
@@ -267,7 +267,7 @@ void KhronicleDaemon::runSnapshotCheck()
                   QStringLiteral("kernel_change_heuristic"),
                   khronicle::logging::defaultWho(),
                   QString(),
-                  nlohmann::json{{"snapshotId", current.id}});
+                  (nlohmann::json{{"snapshotId", current.id}}));
         return;
     }
 
@@ -279,7 +279,7 @@ void KhronicleDaemon::runSnapshotCheck()
                    QStringLiteral("kernel_change_heuristic"),
                    khronicle::logging::defaultWho(),
                    QString(),
-                   nlohmann::json{{"kernelVersion", current.kernelVersion}});
+                   (nlohmann::json{{"kernelVersion", current.kernelVersion}}));
         return;
     }
 
@@ -318,9 +318,9 @@ void KhronicleDaemon::runSnapshotCheck()
               QStringLiteral("kernel_change_heuristic"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"snapshotId", current.id},
+              (nlohmann::json{{"snapshotId", current.id},
                              {"kernelFrom", m_lastSnapshot->kernelVersion},
-                             {"kernelTo", current.kernelVersion}});
+                             {"kernelTo", current.kernelVersion}}));
     m_lastSnapshot = current;
 }
 

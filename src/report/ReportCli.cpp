@@ -226,7 +226,7 @@ int ReportCli::run(int argc, char *argv[])
               QStringLiteral("cli"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"command", command.toStdString()}});
+              (nlohmann::json{{"command", command.toStdString()}}));
     if (ScenarioCapture::isEnabled()) {
         ScenarioCapture::recordStep(nlohmann::json{
             {"action", "report_cli"},
@@ -287,8 +287,8 @@ int ReportCli::runTimelineReport(const QStringList &args)
               QStringLiteral("sqlite_query"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"events", events.size()},
-                             {"format", format.toStdString()}});
+              (nlohmann::json{{"events", events.size()},
+                             {"format", format.toStdString()}}));
     if (format == QStringLiteral("json")) {
         renderTimelineJson(events, *from, *to);
     } else {
@@ -334,9 +334,9 @@ int ReportCli::runDiffReport(const QStringList &args)
               QStringLiteral("sqlite_query"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"snapshotA", snapshotAId.toStdString()},
+              (nlohmann::json{{"snapshotA", snapshotAId.toStdString()},
                              {"snapshotB", snapshotBId.toStdString()},
-                             {"format", format.toStdString()}});
+                             {"format", format.toStdString()}}));
     if (format == QStringLiteral("json")) {
         renderDiffJson(diff, &*snapshotA, &*snapshotB);
     } else {
@@ -389,8 +389,8 @@ int ReportCli::runExplainReport(const QStringList &args)
               QStringLiteral("sqlite_query"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"events", events.size()},
-                             {"format", format.toStdString()}});
+              (nlohmann::json{{"events", events.size()},
+                             {"format", format.toStdString()}}));
     if (format == QStringLiteral("json")) {
         nlohmann::json payload;
         payload["baselineSnapshot"] = result.baselineSnapshotId;
@@ -499,9 +499,9 @@ int ReportCli::runBundleReport(const QStringList &args)
                   QStringLiteral("bundle_export"),
                   khronicle::logging::defaultWho(),
                   QString(),
-                  nlohmann::json{{"events", events.size()},
+                  (nlohmann::json{{"events", events.size()},
                                  {"snapshots", filteredSnapshots.size()},
-                                 {"out", outPath.toStdString()}});
+                                 {"out", outPath.toStdString()}}));
     } catch (const std::exception &ex) {
         std::cerr << "Failed to open database: " << ex.what() << std::endl;
         return 1;
@@ -604,8 +604,8 @@ int ReportCli::runAggregateReport(const QStringList &args)
                   QStringLiteral("bundle_aggregate"),
                   khronicle::logging::defaultWho(),
                   QString(),
-                  nlohmann::json{{"hosts", aggregate["hosts"].size()},
-                                 {"out", outPath.toStdString()}});
+                  (nlohmann::json{{"hosts", aggregate["hosts"].size()},
+                                 {"out", outPath.toStdString()}}));
         return 0;
     }
 
@@ -699,8 +699,8 @@ int ReportCli::runAggregateReport(const QStringList &args)
               QStringLiteral("bundle_aggregate"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"hosts", aggregate["hosts"].size()},
-                             {"out", outPath.toStdString()}});
+              (nlohmann::json{{"hosts", aggregate["hosts"].size()},
+                             {"out", outPath.toStdString()}}));
     return 0;
 }
 

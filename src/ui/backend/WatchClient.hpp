@@ -25,7 +25,7 @@ public:
 
 signals:
     void rulesLoaded(const QVariantList &rules);
-    void signalsLoaded(const QVariantList &signals);
+    void signalsLoaded(const QVariantList &watchSignals);
     void errorOccurred(const QString &message);
 
 private:

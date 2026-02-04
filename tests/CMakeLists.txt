@@ -1,5 +1,8 @@
 enable_testing()
 
+# Enable Qt MOC for tests
+set(CMAKE_AUTOMOC ON)
+
 add_executable(test_models_and_json
     test_models_and_json.cpp
 )
@@ -44,11 +47,18 @@ add_test(NAME test_logging COMMAND test_logging)
 add_executable(test_replay
     test_replay.cpp
     ../src/replay/ReplayHarness.cpp
+    ../src/report/ReportCli.cpp
     ../src/daemon/khronicle_store.cpp
     ../src/daemon/khronicle_api_server.cpp
+    ../src/daemon/khronicle_daemon.cpp
     ../src/daemon/change_explainer.cpp
     ../src/daemon/counterfactual.cpp
+    ../src/daemon/pacman_parser.cpp
+    ../src/daemon/journal_parser.cpp
+    ../src/daemon/snapshot_builder.cpp
+    ../src/daemon/watch_engine.cpp
     ../src/common/logging.cpp
+    ../src/common/process_utils.cpp
     ../src/debug/scenario_capture.cpp
 )
 
@@ -62,6 +72,7 @@ target_link_libraries(test_replay
     PRIVATE
         Qt6::Core
         Qt6::Test
+        Qt6::Network
         nlohmann_json::nlohmann_json
         SQLite::SQLite3
 )
@@ -223,6 +234,7 @@ target_link_libraries(test_api_server
     PRIVATE
         Qt6::Core
         Qt6::Test
+        Qt6::Network
         nlohmann_json::nlohmann_json
         SQLite::SQLite3
 )
@@ -234,7 +246,9 @@ add_executable(test_report_cli
     ../src/report/ReportCli.cpp
     ../src/daemon/change_explainer.cpp
     ../src/daemon/counterfactual.cpp
+    ../src/daemon/khronicle_store.cpp
     ../src/common/logging.cpp
+    ../src/debug/scenario_capture.cpp
 )
 
 target_include_directories(test_report_cli
@@ -324,7 +338,9 @@ add_executable(test_aggregate
     ../src/report/ReportCli.cpp
     ../src/daemon/change_explainer.cpp
     ../src/daemon/counterfactual.cpp
+    ../src/daemon/khronicle_store.cpp
     ../src/common/logging.cpp
+    ../src/debug/scenario_capture.cpp
 )
 
 target_include_directories(test_aggregate
@@ -363,3 +379,25 @@ target_link_libraries(test_fleet_model
 )
 
 add_test(NAME test_fleet_model COMMAND test_fleet_model)
+
+add_executable(test_snapshot_builder
+    test_snapshot_builder.cpp
+    ../src/daemon/snapshot_builder.cpp
+    ../src/common/logging.cpp
+)
+
+target_include_directories(test_snapshot_builder
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src/common
+)
+
+target_link_libraries(test_snapshot_builder
+    PRIVATE
+        Qt6::Core
+        Qt6::Test
+        nlohmann_json::nlohmann_json
+        SQLite::SQLite3
+)
+
+add_test(NAME test_snapshot_builder COMMAND test_snapshot_builder)

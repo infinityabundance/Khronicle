@@ -2,6 +2,7 @@
 
 #include <QTemporaryDir>
 #include <QFile>
+#include <QUuid>
 
 #include <filesystem>
 
@@ -28,7 +29,11 @@ void ReplayHarnessTests::testRunScenario()
     QTemporaryDir homeDir;
     QVERIFY(homeDir.isValid());
     const QByteArray prevHome = qgetenv("HOME");
+    const QByteArray prevSocketName = qgetenv("KHRONICLE_SOCKET_NAME");
     qputenv("HOME", homeDir.path().toUtf8());
+    const QString socketName = QStringLiteral("khronicle-replay-test-")
+        + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    qputenv("KHRONICLE_SOCKET_NAME", socketName.toUtf8());
 
     {
         khronicle::KhronicleStore store;
@@ -72,6 +77,12 @@ void ReplayHarnessTests::testRunScenario()
         qunsetenv("HOME");
     } else {
         qputenv("HOME", prevHome);
+    }
+
+    if (prevSocketName.isEmpty()) {
+        qunsetenv("KHRONICLE_SOCKET_NAME");
+    } else {
+        qputenv("KHRONICLE_SOCKET_NAME", prevSocketName);
     }
 }
 

@@ -82,7 +82,7 @@ std::optional<ParsedLine> parseLine(const std::string &line)
 {
     // Pacman log lines are structured; we only care about install/upgrade/downgrade.
     static const std::regex pattern(
-        R"(^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2})\]\s+\[ALPM\]\s+"
+        R"(^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2})\]\s+\[ALPM\]\s+)"
         R"((installed|upgraded|downgraded)\s+([^\s]+)\s+\(([^\)]*)\))");
 
     std::smatch match;
@@ -214,8 +214,8 @@ PacmanParseResult parsePacmanLog(const std::string &path,
                QStringLiteral("incremental_cursor"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"path", path},
-                              {"cursor", previousCursor.value_or("")}});
+               (nlohmann::json{{"path", path},
+                              {"cursor", previousCursor.value_or("")}}));
 
     std::ifstream file(path);
     if (!file.is_open()) {
@@ -228,7 +228,7 @@ PacmanParseResult parsePacmanLog(const std::string &path,
                   QStringLiteral("file_open"),
                   khronicle::logging::defaultWho(),
                   QString(),
-                  nlohmann::json{{"path", path}});
+                  (nlohmann::json{{"path", path}}));
         return result;
     }
 
@@ -295,8 +295,8 @@ PacmanParseResult parsePacmanLog(const std::string &path,
               QStringLiteral("incremental_cursor"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"events", result.events.size()},
-                             {"newCursor", result.newCursor}});
+              (nlohmann::json{{"events", result.events.size()},
+                             {"newCursor", result.newCursor}}));
     return result;
 }
 
