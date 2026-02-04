@@ -4,7 +4,10 @@
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <random>
+#include <sstream>
 #include <set>
+#include <unistd.h>
 #include <stdexcept>
 
 #include <sqlite3.h>
@@ -23,7 +26,8 @@ constexpr const char *kCreateEventsTable =
     "    details TEXT,"
     "    before_state TEXT,"
     "    after_state TEXT,"
-    "    related_packages TEXT"
+    "    related_packages TEXT,"
+    "    host_id TEXT"
     ");";
 
 constexpr const char *kCreateSnapshotsTable =
@@ -33,13 +37,23 @@ constexpr const char *kCreateSnapshotsTable =
     "    kernel_version TEXT NOT NULL,"
     "    gpu_driver TEXT,"
     "    firmware_versions TEXT,"
-    "    key_packages TEXT"
+    "    key_packages TEXT,"
+    "    host_id TEXT"
     ");";
 
 constexpr const char *kCreateMetaTable =
     "CREATE TABLE IF NOT EXISTS meta ("
     "    key TEXT PRIMARY KEY,"
     "    value TEXT NOT NULL"
+    ");";
+
+constexpr const char *kCreateHostIdentityTable =
+    "CREATE TABLE IF NOT EXISTS host_identity ("
+    "    host_id TEXT PRIMARY KEY,"
+    "    hostname TEXT NOT NULL,"
+    "    display_name TEXT,"
+    "    os TEXT,"
+    "    hardware TEXT"
     ");";
 
 class Statement {
@@ -88,6 +102,49 @@ void execOrThrow(sqlite3 *db, const char *sql)
         sqlite3_free(error);
         throw std::runtime_error(message);
     }
+}
+
+bool columnExists(sqlite3 *db, const std::string &table, const std::string &column)
+{
+    const std::string sql = "PRAGMA table_info(" + table + ");";
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        return false;
+    }
+
+    bool found = false;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *name = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
+        if (name && column == name) {
+            found = true;
+            break;
+        }
+    }
+    sqlite3_finalize(stmt);
+    return found;
+}
+
+std::string generateUuid()
+{
+    std::random_device rd;
+    std::mt19937_64 gen(rd());
+    std::uniform_int_distribution<uint64_t> dist;
+
+    const uint64_t part1 = dist(gen);
+    const uint64_t part2 = dist(gen);
+
+    std::ostringstream out;
+    out << std::hex;
+    out << (part1 >> 32);
+    out << "-";
+    out << ((part1 >> 16) & 0xFFFF);
+    out << "-";
+    out << (part1 & 0xFFFF);
+    out << "-";
+    out << (part2 >> 48);
+    out << "-";
+    out << (part2 & 0xFFFFFFFFFFFFULL);
+    return out.str();
 }
 
 void bindText(sqlite3_stmt *stmt, int index, const std::string &value)
@@ -175,6 +232,7 @@ EventSource sourceFromInt(int value)
 
 struct KhronicleStore::Impl {
     sqlite3 *db = nullptr;
+    HostIdentity hostIdentity;
 };
 
 KhronicleStore::KhronicleStore()
@@ -193,6 +251,52 @@ KhronicleStore::KhronicleStore()
     execOrThrow(impl->db, kCreateEventsTable);
     execOrThrow(impl->db, kCreateSnapshotsTable);
     execOrThrow(impl->db, kCreateMetaTable);
+    execOrThrow(impl->db, kCreateHostIdentityTable);
+
+    // Load or initialize host identity (stable per database).
+    {
+        Statement stmt(impl->db,
+                       "SELECT host_id, hostname, display_name, os, hardware "
+                       "FROM host_identity LIMIT 1;");
+        if (sqlite3_step(stmt.get()) == SQLITE_ROW) {
+            impl->hostIdentity.hostId = columnText(stmt.get(), 0);
+            impl->hostIdentity.hostname = columnText(stmt.get(), 1);
+            impl->hostIdentity.displayName = columnText(stmt.get(), 2);
+            impl->hostIdentity.os = columnText(stmt.get(), 3);
+            impl->hostIdentity.hardware = columnText(stmt.get(), 4);
+        } else {
+            char hostnameBuf[256] = {};
+            if (gethostname(hostnameBuf, sizeof(hostnameBuf)) != 0) {
+                hostnameBuf[0] = '\0';
+            }
+
+            impl->hostIdentity.hostId = generateUuid();
+            impl->hostIdentity.hostname = hostnameBuf;
+            impl->hostIdentity.displayName.clear();
+            impl->hostIdentity.os = "Linux";
+            impl->hostIdentity.hardware.clear();
+
+            Statement insertStmt(impl->db,
+                                 "INSERT INTO host_identity (host_id, hostname, "
+                                 "display_name, os, hardware) VALUES (?, ?, ?, ?, ?);");
+            bindText(insertStmt.get(), 1, impl->hostIdentity.hostId);
+            bindText(insertStmt.get(), 2, impl->hostIdentity.hostname);
+            bindOptionalText(insertStmt.get(), 3, impl->hostIdentity.displayName);
+            bindOptionalText(insertStmt.get(), 4, impl->hostIdentity.os);
+            bindOptionalText(insertStmt.get(), 5, impl->hostIdentity.hardware);
+
+            if (sqlite3_step(insertStmt.get()) != SQLITE_DONE) {
+                throw std::runtime_error("failed to insert host identity");
+            }
+        }
+    }
+
+    if (!columnExists(impl->db, "events", "host_id")) {
+        execOrThrow(impl->db, "ALTER TABLE events ADD COLUMN host_id TEXT;");
+    }
+    if (!columnExists(impl->db, "snapshots", "host_id")) {
+        execOrThrow(impl->db, "ALTER TABLE snapshots ADD COLUMN host_id TEXT;");
+    }
 }
 
 KhronicleStore::~KhronicleStore()
@@ -203,12 +307,17 @@ KhronicleStore::~KhronicleStore()
     }
 }
 
+HostIdentity KhronicleStore::getHostIdentity() const
+{
+    return impl->hostIdentity;
+}
+
 void KhronicleStore::addEvent(const KhronicleEvent &event)
 {
     Statement stmt(impl->db,
                    "INSERT OR REPLACE INTO events (id, timestamp, category, "
                    "source, summary, details, before_state, after_state, "
-                   "related_packages) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);");
+                   "related_packages, host_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
     bindText(stmt.get(), 1, event.id);
     sqlite3_bind_int64(stmt.get(), 2, toEpochSeconds(event.timestamp));
     sqlite3_bind_int(stmt.get(), 3, static_cast<int>(event.category));
@@ -218,6 +327,7 @@ void KhronicleStore::addEvent(const KhronicleEvent &event)
     bindJson(stmt.get(), 7, event.beforeState);
     bindJson(stmt.get(), 8, event.afterState);
     bindJson(stmt.get(), 9, nlohmann::json(event.relatedPackages));
+    bindText(stmt.get(), 10, event.hostId.empty() ? impl->hostIdentity.hostId : event.hostId);
 
     if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
         throw std::runtime_error("failed to insert event");
@@ -229,13 +339,16 @@ void KhronicleStore::addSnapshot(const SystemSnapshot &snapshot)
     Statement stmt(impl->db,
                    "INSERT OR REPLACE INTO snapshots (id, timestamp, "
                    "kernel_version, gpu_driver, firmware_versions, "
-                   "key_packages) VALUES (?, ?, ?, ?, ?, ?);");
+                   "key_packages, host_id) VALUES (?, ?, ?, ?, ?, ?, ?);");
     bindText(stmt.get(), 1, snapshot.id);
     sqlite3_bind_int64(stmt.get(), 2, toEpochSeconds(snapshot.timestamp));
     bindText(stmt.get(), 3, snapshot.kernelVersion);
     bindJson(stmt.get(), 4, snapshot.gpuDriver);
     bindJson(stmt.get(), 5, snapshot.firmwareVersions);
     bindJson(stmt.get(), 6, snapshot.keyPackages);
+    bindText(stmt.get(), 7, snapshot.hostIdentity.hostId.empty()
+        ? impl->hostIdentity.hostId
+        : snapshot.hostIdentity.hostId);
 
     if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
         throw std::runtime_error("failed to insert snapshot");
@@ -247,7 +360,7 @@ std::vector<KhronicleEvent> KhronicleStore::getEventsSince(
 {
     Statement stmt(impl->db,
                    "SELECT id, timestamp, category, source, summary, details, "
-                   "before_state, after_state, related_packages "
+                   "before_state, after_state, related_packages, host_id "
                    "FROM events WHERE timestamp >= ? ORDER BY timestamp ASC;");
     sqlite3_bind_int64(stmt.get(), 1, toEpochSeconds(since));
 
@@ -266,6 +379,10 @@ std::vector<KhronicleEvent> KhronicleStore::getEventsSince(
         if (related.is_array()) {
             event.relatedPackages = related.get<std::vector<std::string>>();
         }
+        event.hostId = columnText(stmt.get(), 9);
+        if (event.hostId.empty()) {
+            event.hostId = impl->hostIdentity.hostId;
+        }
         events.push_back(std::move(event));
     }
 
@@ -278,7 +395,7 @@ std::vector<KhronicleEvent> KhronicleStore::getEventsBetween(
 {
     Statement stmt(impl->db,
                    "SELECT id, timestamp, category, source, summary, details, "
-                   "before_state, after_state, related_packages "
+                   "before_state, after_state, related_packages, host_id "
                    "FROM events WHERE timestamp >= ? AND timestamp <= ? "
                    "ORDER BY timestamp ASC;");
     sqlite3_bind_int64(stmt.get(), 1, toEpochSeconds(from));
@@ -299,6 +416,10 @@ std::vector<KhronicleEvent> KhronicleStore::getEventsBetween(
         if (related.is_array()) {
             event.relatedPackages = related.get<std::vector<std::string>>();
         }
+        event.hostId = columnText(stmt.get(), 9);
+        if (event.hostId.empty()) {
+            event.hostId = impl->hostIdentity.hostId;
+        }
         events.push_back(std::move(event));
     }
 
@@ -309,7 +430,7 @@ std::vector<SystemSnapshot> KhronicleStore::listSnapshots() const
 {
     Statement stmt(impl->db,
                    "SELECT id, timestamp, kernel_version, gpu_driver, "
-                   "firmware_versions, key_packages "
+                   "firmware_versions, key_packages, host_id "
                    "FROM snapshots ORDER BY timestamp ASC;");
 
     std::vector<SystemSnapshot> snapshots;
@@ -321,6 +442,11 @@ std::vector<SystemSnapshot> KhronicleStore::listSnapshots() const
         snapshot.gpuDriver = columnJson(stmt.get(), 3);
         snapshot.firmwareVersions = columnJson(stmt.get(), 4);
         snapshot.keyPackages = columnJson(stmt.get(), 5);
+        const std::string hostId = columnText(stmt.get(), 6);
+        snapshot.hostIdentity = impl->hostIdentity;
+        if (!hostId.empty()) {
+            snapshot.hostIdentity.hostId = hostId;
+        }
         snapshots.push_back(std::move(snapshot));
     }
 
@@ -332,7 +458,7 @@ std::optional<SystemSnapshot> KhronicleStore::getSnapshot(
 {
     Statement stmt(impl->db,
                    "SELECT id, timestamp, kernel_version, gpu_driver, "
-                   "firmware_versions, key_packages "
+                   "firmware_versions, key_packages, host_id "
                    "FROM snapshots WHERE id = ? LIMIT 1;");
     bindText(stmt.get(), 1, id);
 
@@ -347,6 +473,11 @@ std::optional<SystemSnapshot> KhronicleStore::getSnapshot(
     snapshot.gpuDriver = columnJson(stmt.get(), 3);
     snapshot.firmwareVersions = columnJson(stmt.get(), 4);
     snapshot.keyPackages = columnJson(stmt.get(), 5);
+    const std::string hostId = columnText(stmt.get(), 6);
+    snapshot.hostIdentity = impl->hostIdentity;
+    if (!hostId.empty()) {
+        snapshot.hostIdentity.hostId = hostId;
+    }
 
     return snapshot;
 }
@@ -356,7 +487,7 @@ std::optional<SystemSnapshot> KhronicleStore::getSnapshotBefore(
 {
     Statement stmt(impl->db,
                    "SELECT id, timestamp, kernel_version, gpu_driver, "
-                   "firmware_versions, key_packages "
+                   "firmware_versions, key_packages, host_id "
                    "FROM snapshots WHERE timestamp <= ? "
                    "ORDER BY timestamp DESC LIMIT 1;");
     sqlite3_bind_int64(stmt.get(), 1, toEpochSeconds(t));
@@ -372,6 +503,11 @@ std::optional<SystemSnapshot> KhronicleStore::getSnapshotBefore(
     snapshot.gpuDriver = columnJson(stmt.get(), 3);
     snapshot.firmwareVersions = columnJson(stmt.get(), 4);
     snapshot.keyPackages = columnJson(stmt.get(), 5);
+    const std::string hostId = columnText(stmt.get(), 6);
+    snapshot.hostIdentity = impl->hostIdentity;
+    if (!hostId.empty()) {
+        snapshot.hostIdentity.hostId = hostId;
+    }
     return snapshot;
 }
 
@@ -380,7 +516,7 @@ std::optional<SystemSnapshot> KhronicleStore::getSnapshotAfter(
 {
     Statement stmt(impl->db,
                    "SELECT id, timestamp, kernel_version, gpu_driver, "
-                   "firmware_versions, key_packages "
+                   "firmware_versions, key_packages, host_id "
                    "FROM snapshots WHERE timestamp >= ? "
                    "ORDER BY timestamp ASC LIMIT 1;");
     sqlite3_bind_int64(stmt.get(), 1, toEpochSeconds(t));
@@ -396,6 +532,11 @@ std::optional<SystemSnapshot> KhronicleStore::getSnapshotAfter(
     snapshot.gpuDriver = columnJson(stmt.get(), 3);
     snapshot.firmwareVersions = columnJson(stmt.get(), 4);
     snapshot.keyPackages = columnJson(stmt.get(), 5);
+    const std::string hostId = columnText(stmt.get(), 6);
+    snapshot.hostIdentity = impl->hostIdentity;
+    if (!hostId.empty()) {
+        snapshot.hostIdentity.hostId = hostId;
+    }
     return snapshot;
 }
 

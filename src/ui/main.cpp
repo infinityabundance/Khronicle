@@ -1,10 +1,13 @@
 #include <QCoreApplication>
+#include <memory>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QCommandLineParser>
 
 #include "ui/backend/KhronicleApiClient.hpp"
+#include "ui/backend/FleetModel.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -13,11 +16,32 @@ int main(int argc, char *argv[])
     QQuickStyle::setStyle(QStringLiteral("org.kde.desktop"));
 
     QQmlApplicationEngine engine;
-    khronicle::KhronicleApiClient apiClient;
-    engine.rootContext()->setContextProperty(QStringLiteral("khronicleApi"),
-                                             &apiClient);
-    const QUrl url = QUrl::fromLocalFile(
-        QStringLiteral(KHRONICLE_QML_DIR "/Main.qml"));
+    QCommandLineParser parser;
+    parser.addHelpOption();
+    QCommandLineOption fleetOption(QStringList() << "fleet",
+                                   "Open in fleet mode with aggregate JSON file.",
+                                   "path");
+    parser.addOption(fleetOption);
+    parser.process(app);
+
+    QUrl url;
+    std::unique_ptr<khronicle::FleetModel> fleetModel;
+    std::unique_ptr<khronicle::KhronicleApiClient> apiClient;
+
+    if (parser.isSet(fleetOption)) {
+        fleetModel = std::make_unique<khronicle::FleetModel>();
+        fleetModel->loadAggregateFile(parser.value(fleetOption));
+        engine.rootContext()->setContextProperty(QStringLiteral("fleetModel"),
+                                                 fleetModel.get());
+        url = QUrl::fromLocalFile(
+            QStringLiteral(KHRONICLE_QML_DIR "/FleetMain.qml"));
+    } else {
+        apiClient = std::make_unique<khronicle::KhronicleApiClient>();
+        engine.rootContext()->setContextProperty(QStringLiteral("khronicleApi"),
+                                                 apiClient.get());
+        url = QUrl::fromLocalFile(
+            QStringLiteral(KHRONICLE_QML_DIR "/Main.qml"));
+    }
 
     QObject::connect(
         &engine,

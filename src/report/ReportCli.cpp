@@ -5,6 +5,10 @@
 
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QTemporaryDir>
+#include <QProcess>
 
 #include "common/json_utils.hpp"
 #include "common/models.hpp"
@@ -21,7 +25,9 @@ QString usageText()
         "Usage:\n"
         "  khronicle-report timeline --from ISO --to ISO [--format markdown|json]\n"
         "  khronicle-report diff --snapshot-a ID --snapshot-b ID [--format markdown|json]\n"
-        "  khronicle-report explain --from ISO --to ISO [--format markdown|json]\n");
+        "  khronicle-report explain --from ISO --to ISO [--format markdown|json]\n"
+        "  khronicle-report bundle --from ISO --to ISO --out PATH\n"
+        "  khronicle-report aggregate --input PATH --format markdown|json --out PATH\n");
 }
 
 QString humanizePath(const std::string &path)
@@ -167,6 +173,33 @@ QString getFormat(const QStringList &args)
     return value.toLower();
 }
 
+bool writeJsonFile(const QString &path, const nlohmann::json &payload)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        return false;
+    }
+    const QByteArray data = QByteArray::fromStdString(payload.dump(2));
+    if (file.write(data) != data.size()) {
+        return false;
+    }
+    return true;
+}
+
+nlohmann::json readJsonFile(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return nlohmann::json();
+    }
+    const QByteArray data = file.readAll();
+    try {
+        return nlohmann::json::parse(data.toStdString());
+    } catch (const nlohmann::json::parse_error &) {
+        return nlohmann::json();
+    }
+}
+
 } // namespace
 
 int ReportCli::run(int argc, char *argv[])
@@ -191,6 +224,12 @@ int ReportCli::run(int argc, char *argv[])
     }
     if (command == QStringLiteral("explain")) {
         return runExplainReport(args);
+    }
+    if (command == QStringLiteral("bundle")) {
+        return runBundleReport(args);
+    }
+    if (command == QStringLiteral("aggregate")) {
+        return runAggregateReport(args);
     }
 
     std::cerr << usageText().toStdString();
@@ -321,6 +360,269 @@ int ReportCli::runExplainReport(const QStringList &args)
         std::cout << "\n" << result.explanationSummary << "\n";
     }
 
+    return 0;
+}
+
+int ReportCli::runBundleReport(const QStringList &args)
+{
+    const QString fromValue = getArgValue(args, QStringLiteral("--from"));
+    const QString toValue = getArgValue(args, QStringLiteral("--to"));
+    const QString outPath = getArgValue(args, QStringLiteral("--out"));
+
+    if (fromValue.isEmpty() || toValue.isEmpty() || outPath.isEmpty()) {
+        std::cerr << usageText().toStdString();
+        return 1;
+    }
+
+    const auto from = parseIso8601(fromValue);
+    const auto to = parseIso8601(toValue);
+    if (!from.has_value() || !to.has_value()) {
+        std::cerr << "Invalid ISO8601 timestamp." << std::endl;
+        return 1;
+    }
+
+    try {
+        KhronicleStore store;
+        const auto events = store.getEventsBetween(*from, *to);
+        const auto snapshots = store.listSnapshots();
+
+        std::vector<SystemSnapshot> filteredSnapshots;
+        for (const auto &snapshot : snapshots) {
+            if (snapshot.timestamp >= *from && snapshot.timestamp <= *to) {
+                filteredSnapshots.push_back(snapshot);
+            }
+        }
+
+        nlohmann::json metadata;
+        metadata["hostIdentity"] = store.getHostIdentity();
+        metadata["exportTimestamp"] =
+            QDateTime::currentDateTimeUtc().toString(Qt::ISODate).toStdString();
+        metadata["from"] = toIso8601Utc(*from);
+        metadata["to"] = toIso8601Utc(*to);
+
+        QTemporaryDir tempDir;
+        if (!tempDir.isValid()) {
+            std::cerr << "Failed to create temporary directory." << std::endl;
+            return 1;
+        }
+
+        const QString bundleRoot = tempDir.path() + QDir::separator() + "bundle";
+        if (!QDir().mkpath(bundleRoot)) {
+            std::cerr << "Failed to create bundle directory." << std::endl;
+            return 1;
+        }
+
+        if (!writeJsonFile(bundleRoot + QDir::separator() + "metadata.json",
+                           metadata)
+            || !writeJsonFile(bundleRoot + QDir::separator() + "events.json",
+                              nlohmann::json(events))
+            || !writeJsonFile(bundleRoot + QDir::separator() + "snapshots.json",
+                              nlohmann::json(filteredSnapshots))
+            || !writeJsonFile(bundleRoot + QDir::separator() + "diffs.json",
+                              nlohmann::json::array())
+            || !writeJsonFile(bundleRoot + QDir::separator() + "audit_log.json",
+                              nlohmann::json::array())) {
+            std::cerr << "Failed to write bundle files." << std::endl;
+            return 1;
+        }
+
+        QFile::remove(outPath);
+        QProcess tar;
+        tar.start(QStringLiteral("tar"),
+                  {QStringLiteral("-czf"),
+                   outPath,
+                   QStringLiteral("-C"),
+                   tempDir.path(),
+                   QStringLiteral("bundle")});
+
+        if (!tar.waitForStarted() || !tar.waitForFinished()) {
+            std::cerr << "Failed to create bundle archive." << std::endl;
+            return 1;
+        }
+        if (tar.exitStatus() != QProcess::NormalExit || tar.exitCode() != 0) {
+            std::cerr << "tar failed to create bundle." << std::endl;
+            return 1;
+        }
+    } catch (const std::exception &ex) {
+        std::cerr << "Failed to open database: " << ex.what() << std::endl;
+        return 1;
+    }
+
+    return 0;
+}
+
+int ReportCli::runAggregateReport(const QStringList &args)
+{
+    const QString inputPath = getArgValue(args, QStringLiteral("--input"));
+    const QString outPath = getArgValue(args, QStringLiteral("--out"));
+    const QString format = getFormat(args);
+
+    if (inputPath.isEmpty() || outPath.isEmpty()) {
+        std::cerr << usageText().toStdString();
+        return 1;
+    }
+
+    if (format != QStringLiteral("markdown") && format != QStringLiteral("json")) {
+        std::cerr << "Invalid format. Use markdown or json." << std::endl;
+        return 1;
+    }
+
+    QDir inputDir(inputPath);
+    if (!inputDir.exists()) {
+        std::cerr << "Input path does not exist." << std::endl;
+        return 1;
+    }
+
+    nlohmann::json aggregate;
+    aggregate["generatedAt"] =
+        QDateTime::currentDateTimeUtc().toString(Qt::ISODate).toStdString();
+    aggregate["hosts"] = nlohmann::json::array();
+
+    const QFileInfoList entries = inputDir.entryInfoList(
+        QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot);
+
+    for (const QFileInfo &entry : entries) {
+        QString bundleDirPath;
+        QTemporaryDir tempDir;
+
+        if (entry.isDir()) {
+            bundleDirPath = entry.absoluteFilePath();
+            if (!QFile::exists(bundleDirPath + "/metadata.json")) {
+                if (QFile::exists(bundleDirPath + "/bundle/metadata.json")) {
+                    bundleDirPath = bundleDirPath + "/bundle";
+                } else {
+                    continue;
+                }
+            }
+        } else if (entry.isFile() && entry.fileName().endsWith(".tar.gz")) {
+            if (!tempDir.isValid()) {
+                continue;
+            }
+            QProcess tar;
+            tar.start(QStringLiteral("tar"),
+                      {QStringLiteral("-xzf"),
+                       entry.absoluteFilePath(),
+                       QStringLiteral("-C"),
+                       tempDir.path()});
+            if (!tar.waitForFinished() || tar.exitCode() != 0) {
+                continue;
+            }
+            if (QFile::exists(tempDir.path() + "/bundle/metadata.json")) {
+                bundleDirPath = tempDir.path() + "/bundle";
+            } else if (QFile::exists(tempDir.path() + "/metadata.json")) {
+                bundleDirPath = tempDir.path();
+            } else {
+                continue;
+            }
+        } else {
+            continue;
+        }
+
+        const nlohmann::json metadata =
+            readJsonFile(bundleDirPath + "/metadata.json");
+        if (metadata.is_null() || metadata.empty()) {
+            continue;
+        }
+
+        nlohmann::json host;
+        host["hostIdentity"] = metadata.value("hostIdentity", nlohmann::json::object());
+        host["events"] = readJsonFile(bundleDirPath + "/events.json");
+        host["snapshots"] = readJsonFile(bundleDirPath + "/snapshots.json");
+        host["auditLog"] = readJsonFile(bundleDirPath + "/audit_log.json");
+        aggregate["hosts"].push_back(host);
+    }
+
+    if (format == QStringLiteral("json")) {
+        if (!writeJsonFile(outPath, aggregate)) {
+            std::cerr << "Failed to write aggregate JSON." << std::endl;
+            return 1;
+        }
+        return 0;
+    }
+
+    QFile outFile(outPath);
+    if (!outFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        std::cerr << "Failed to write aggregate report." << std::endl;
+        return 1;
+    }
+
+    QByteArray output;
+    output += "# Khronicle Aggregate Report\n\n";
+    output += "Aggregated from ";
+    output += QByteArray::number(aggregate["hosts"].size());
+    output += " hosts on ";
+    output += aggregate["generatedAt"].get<std::string>().c_str();
+    output += "\n\n## Hosts\n\n";
+
+    for (const auto &host : aggregate["hosts"]) {
+        const auto identity = host.value("hostIdentity", nlohmann::json::object());
+        const std::string name = identity.value("displayName", "");
+        const std::string hostname = identity.value("hostname", "");
+        const std::string hostId = identity.value("hostId", "");
+        output += "- ";
+        if (!name.empty()) {
+            output += name.c_str();
+            if (!hostname.empty()) {
+                output += " (";
+                output += hostname.c_str();
+                output += ")";
+            }
+        } else if (!hostname.empty()) {
+            output += hostname.c_str();
+        } else {
+            output += "Host";
+        }
+        if (!hostId.empty()) {
+            output += " [hostId: ";
+            output += hostId.c_str();
+            output += "]";
+        }
+        output += "\n";
+    }
+
+    output += "\n## Recent Changes (Last 24h)\n\n";
+
+    const auto now = QDateTime::currentDateTimeUtc();
+    const auto cutoff = now.addSecs(-24 * 3600).toString(Qt::ISODate).toStdString();
+
+    for (const auto &host : aggregate["hosts"]) {
+        const auto identity = host.value("hostIdentity", nlohmann::json::object());
+        const std::string name = identity.value("displayName", "");
+        const std::string hostname = identity.value("hostname", "");
+
+        output += "### ";
+        if (!name.empty()) {
+            output += name.c_str();
+        } else if (!hostname.empty()) {
+            output += hostname.c_str();
+        } else {
+            output += "Host";
+        }
+        output += "\n";
+
+        const auto events = host.value("events", nlohmann::json::array());
+        for (const auto &event : events) {
+            const std::string ts = event.value("timestamp", "");
+            if (!ts.empty() && ts < cutoff) {
+                continue;
+            }
+            const std::string summary = event.value("summary", "");
+            const std::string category = event.value("category", "");
+            const std::string risk = event.value("riskLevel", "info");
+            output += "- [";
+            output += ts.c_str();
+            output += "] (";
+            output += category.c_str();
+            output += ", ";
+            output += risk.c_str();
+            output += ") ";
+            output += summary.c_str();
+            output += "\n";
+        }
+        output += "\n";
+    }
+
+    outFile.write(output);
     return 0;
 }
 

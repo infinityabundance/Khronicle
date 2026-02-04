@@ -17,6 +17,7 @@ public:
 
     void addEvent(const KhronicleEvent &event);
     void addSnapshot(const SystemSnapshot &snapshot);
+    HostIdentity getHostIdentity() const;
 
     std::vector<KhronicleEvent> getEventsSince(
         std::chrono::system_clock::time_point since) const;

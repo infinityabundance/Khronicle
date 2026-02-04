@@ -38,6 +38,7 @@ target_link_libraries(khronicle-daemon
 add_executable(khronicle
     src/ui/main.cpp
     src/ui/backend/KhronicleApiClient.cpp
+    src/ui/backend/FleetModel.cpp
 )
 
 target_include_directories(khronicle
