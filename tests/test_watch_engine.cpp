@@ -19,6 +19,8 @@ private slots:
 
     void testEventRuleMatch();
     void testActiveWindow();
+    void testDisabledRule();
+    void testPackageNameContains();
 
 private:
     QTemporaryDir m_tempDir;
@@ -155,6 +157,66 @@ void WatchEngineTests::testActiveWindow()
     const auto signalsOutside = store.getWatchSignalsSince(
         std::chrono::system_clock::time_point{});
     QCOMPARE(static_cast<int>(signalsOutside.size()), 1);
+}
+
+void WatchEngineTests::testDisabledRule()
+{
+    resetDb();
+
+    khronicle::KhronicleStore store;
+    khronicle::WatchRule rule;
+    rule.id = "disabled";
+    rule.name = "Disabled";
+    rule.scope = khronicle::WatchScope::Event;
+    rule.severity = khronicle::WatchSeverity::Warning;
+    rule.enabled = false;
+    rule.categoryEquals = "kernel";
+    store.upsertWatchRule(rule);
+
+    khronicle::WatchEngine engine(store);
+    khronicle::KhronicleEvent event;
+    event.id = "event-1";
+    event.timestamp = std::chrono::system_clock::now();
+    event.category = khronicle::EventCategory::Kernel;
+    event.source = khronicle::EventSource::Other;
+    event.summary = "Kernel update";
+    event.hostId = store.getHostIdentity().hostId;
+
+    engine.evaluateEvent(event);
+
+    const auto signals = store.getWatchSignalsSince(
+        std::chrono::system_clock::time_point{});
+    QCOMPARE(static_cast<int>(signals.size()), 0);
+}
+
+void WatchEngineTests::testPackageNameContains()
+{
+    resetDb();
+
+    khronicle::KhronicleStore store;
+    khronicle::WatchRule rule;
+    rule.id = "pkg-match";
+    rule.name = "Package match";
+    rule.scope = khronicle::WatchScope::Event;
+    rule.severity = khronicle::WatchSeverity::Info;
+    rule.packageNameContains = "nvidia";
+    store.upsertWatchRule(rule);
+
+    khronicle::WatchEngine engine(store);
+    khronicle::KhronicleEvent event;
+    event.id = "event-1";
+    event.timestamp = std::chrono::system_clock::now();
+    event.category = khronicle::EventCategory::GpuDriver;
+    event.source = khronicle::EventSource::Pacman;
+    event.summary = "NVIDIA update";
+    event.relatedPackages = {"nvidia-utils"};
+    event.hostId = store.getHostIdentity().hostId;
+
+    engine.evaluateEvent(event);
+
+    const auto signals = store.getWatchSignalsSince(
+        std::chrono::system_clock::time_point{});
+    QCOMPARE(static_cast<int>(signals.size()), 1);
 }
 
 QTEST_MAIN(WatchEngineTests)
