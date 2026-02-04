@@ -8,6 +8,7 @@
 #include <string>
 
 #include <QDateTime>
+#include <QFile>
 #include <QProcess>
 #include <QStringList>
 
@@ -126,6 +127,15 @@ bool messageHasGpuSignal(const QString &message)
 JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since)
 {
     // Query journalctl incrementally, returning only events newer than "since".
+    const QString overridePath = qEnvironmentVariable("KHRONICLE_JOURNAL_PATH");
+    if (!overridePath.isEmpty()) {
+        QFile file(overridePath);
+        if (file.open(QIODevice::ReadOnly)) {
+            const QStringList lines =
+                QString::fromUtf8(file.readAll()).split('\n', Qt::SkipEmptyParts);
+            return parseJournalOutputLines(lines, since);
+        }
+    }
     QProcess process;
     QString sinceArg = QStringLiteral("--since=%1").arg(toIsoSince(since));
     KLOG_DEBUG(QStringLiteral("JournalParser"),

@@ -2,6 +2,7 @@
 
 #include "report/ReportCli.hpp"
 #include "common/logging.hpp"
+#include "debug/scenario_capture.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -29,6 +30,16 @@ int main(int argc, char *argv[])
               khronicle::logging::defaultWho(),
               QString(),
               nlohmann::json{{"args", filteredArgs.size()}});
+
+    if (qEnvironmentVariableIntValue("KHRONICLE_SCENARIO_CAPTURE") == 1) {
+        const QString scenarioId = qEnvironmentVariable("KHRONICLE_SCENARIO_ID");
+        const QString title = qEnvironmentVariable("KHRONICLE_SCENARIO_TITLE");
+        const QString desc = qEnvironmentVariable("KHRONICLE_SCENARIO_DESC");
+        if (qEnvironmentVariable("KHRONICLE_SCENARIO_ENTRY").isEmpty()) {
+            qputenv("KHRONICLE_SCENARIO_ENTRY", "report_cli");
+        }
+        khronicle::ScenarioCapture::start(scenarioId, title, desc);
+    }
 
     // CLI entry point: delegate to ReportCli for argument parsing and output.
     khronicle::ReportCli cli;

@@ -41,6 +41,33 @@ target_link_libraries(test_logging
 
 add_test(NAME test_logging COMMAND test_logging)
 
+add_executable(test_replay
+    test_replay.cpp
+    ../src/replay/ReplayHarness.cpp
+    ../src/daemon/khronicle_store.cpp
+    ../src/daemon/khronicle_api_server.cpp
+    ../src/daemon/change_explainer.cpp
+    ../src/daemon/counterfactual.cpp
+    ../src/common/logging.cpp
+    ../src/debug/scenario_capture.cpp
+)
+
+target_include_directories(test_replay
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src/common
+)
+
+target_link_libraries(test_replay
+    PRIVATE
+        Qt6::Core
+        Qt6::Test
+        nlohmann_json::nlohmann_json
+        SQLite::SQLite3
+)
+
+add_test(NAME test_replay COMMAND test_replay)
+
 add_executable(test_store
     test_store.cpp
     ../src/daemon/khronicle_store.cpp
@@ -183,6 +210,7 @@ add_executable(test_api_server
     ../src/daemon/change_explainer.cpp
     ../src/daemon/counterfactual.cpp
     ../src/common/logging.cpp
+    ../src/debug/scenario_capture.cpp
 )
 
 target_include_directories(test_api_server
