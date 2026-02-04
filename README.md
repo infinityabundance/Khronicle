@@ -89,7 +89,7 @@ For a deeper architecture walk-through:
 - `SYSTEMS-ARCHITECTURE.md` — OS integration and service model
 - `CODE.md` — top-down codebase navigation guide
 - `GOVERNANCE.md` — stewardship and decision-making principles
-- `STABILITY.md` — compatibility guarantees and versioning
+- `STABILITY.md` — compatibility expectations and versioning
 - `EVOLUTION.md` — how Khronicle grows without losing integrity
 - `INVARIANTS.md` — non-negotiable system properties
 - `TRUTH-MODEL.md` — what Khronicle claims vs does not claim
@@ -114,6 +114,23 @@ Its accuracy depends on the logs and snapshots it reads.
 - Not a policy engine
 - Not a predictive or AI-driven system
 - Not an enforcement tool
+
+## How to Read This Project
+
+Khronicle’s documentation describes design intent, architectural goals, and
+interpretive aims. These descriptions are not promises and not assurances of
+correctness, completeness, reliability, or suitability.
+
+In practice, some system changes may not be observed. Recorded data may be
+partial, delayed, or misleading. Interpretations and explanations may be wrong.
+Rules and signals may fail to trigger or may trigger unnecessarily. This is
+expected.
+
+Khronicle is best understood as an exploratory and interpretive aid for
+examining system history, not as an authority or source of truth. Users should
+assume that any expectation described in this documentation may fail to be met,
+and should not rely on Khronicle as a sole basis for decisions, judgments, or
+actions.
 
 ## Contributing & Development
 

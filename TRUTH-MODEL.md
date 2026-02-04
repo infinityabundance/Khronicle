@@ -1,5 +1,8 @@
 # Truth Model
 
+This document describes intended truth-claims and boundaries; it does not
+promise behavior, correctness, or long-term adherence.
+
 This document describes what Khronicle claims, and what it explicitly does not
 claim. It prevents epistemic overreach.
 
@@ -20,7 +23,7 @@ Khronicle does not claim:
 
 - Causation or intent
 - Correctness of system configuration
-- Security guarantees
+- Security assurances
 - Absence of tampering
 
 Logs and snapshots can be incomplete or misleading; Khronicle does not assert
@@ -31,4 +34,3 @@ otherwise.
 Provenance increases inspectability, not truthfulness. Audit logs explain how
 conclusions were reached, not that they are correct. Interpretations remain
 reversible and must be traceable to their inputs.
-

@@ -37,3 +37,11 @@ Khronicle optimizes for long-term understanding, not short-term novelty.
 If a change is clever but not clear, favor the clear version.
 
 See `GOVERNANCE.md` for decision-making principles.
+
+## Expectations and Interpretation
+
+Contributors should avoid language that implies certainty, authority, or
+reliability. Documentation and UI text should describe what the system attempts
+to do, not what it promises. When in doubt, prefer wording that acknowledges
+uncertainty, partial observability, and failure modes. Avoid enforcement or
+blame language.

@@ -1,5 +1,8 @@
 # Systems Architecture
 
+This document describes intended integration and operating context; it does not
+promise behavior, correctness, or long-term adherence.
+
 ## Host-Level Overview
 
 CachyOS / Arch
@@ -53,4 +56,3 @@ The daemon reads logs but never modifies them. Ingestion is read-only.
 2. Transfer bundles to a review machine (scp/rsync/USB).
 3. Aggregate bundles with `khronicle-report aggregate`.
 4. Launch `khronicle --fleet aggregate.json` for read-only review.
-

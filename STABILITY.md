@@ -1,5 +1,11 @@
 # Stability
 
+This document describes intended compatibility expectations; it does not
+promise behavior, correctness, or long-term adherence.
+
+This document defines what users and developers should expect. If any of these
+change, it is considered a breaking change.
+
 ## Stability Tiers
 
 ### SQLite Schema

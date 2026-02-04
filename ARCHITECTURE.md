@@ -1,5 +1,8 @@
 # Architecture
 
+This document describes intended structure and guiding principles; it does not
+promise behavior, correctness, or long-term adherence.
+
 ## Overview
 
 Khronicle is built as a local daemon with multiple clients. The daemon performs
@@ -91,4 +94,3 @@ All APIs are local-only and intended for on-host tools.
 - Rules & signals: extend `WatchRule.extra` for new criteria without breaking
   existing JSON.
 - UI: add a QML component and register any needed backend API client helpers.
-

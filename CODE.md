@@ -1,5 +1,8 @@
 # Code Guide
 
+This document describes intended structure and navigation; it does not
+promise behavior, correctness, or long-term adherence.
+
 ## Repository Layout
 
 - `src/`
@@ -98,4 +101,3 @@ popup. The CLI reads directly from SQLite to generate reports and bundles.
   catches and returns errors as JSON.
 - New event types should be added to `EventCategory` and reflected in
   `json_utils.hpp` mappings.
-
