@@ -19,6 +19,7 @@ namespace {
 
 QString toIsoSince(std::chrono::system_clock::time_point since)
 {
+    // journalctl expects ISO-8601 timestamps in UTC.
     const auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(
                             since.time_since_epoch())
                             .count();
@@ -42,6 +43,7 @@ std::optional<std::chrono::system_clock::time_point> parseTimestamp(
 
 QString extractMessage(const QString &line)
 {
+    // Format: <timestamp> <hostname> <unit>: <message>
     // Format: <timestamp> <hostname> <unit>: <message>
     int firstSpace = line.indexOf(' ');
     if (firstSpace < 0) {
@@ -120,6 +122,7 @@ bool messageHasGpuSignal(const QString &message)
 
 JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since)
 {
+    // Query journalctl incrementally, returning only events newer than "since".
     JournalParseResult result;
     result.lastTimestamp = since;
 

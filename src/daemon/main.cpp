@@ -10,6 +10,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationName(QStringLiteral("khronicle-daemon"));
     qInfo() << "Khronicle daemon starting...";
 
+    // The daemon lives for the lifetime of the process.
     khronicle::KhronicleDaemon daemon;
     daemon.start();
 

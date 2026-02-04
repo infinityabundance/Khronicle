@@ -31,6 +31,7 @@ int main(int argc, char *argv[])
     std::unique_ptr<khronicle::WatchClient> watchClient;
 
     if (parser.isSet(fleetOption)) {
+        // Fleet mode is offline and read-only: it loads aggregate JSON directly.
         fleetModel = std::make_unique<khronicle::FleetModel>();
         fleetModel->loadAggregateFile(parser.value(fleetOption));
         engine.rootContext()->setContextProperty(QStringLiteral("fleetModel"),
@@ -38,6 +39,7 @@ int main(int argc, char *argv[])
         url = QUrl::fromLocalFile(
             QStringLiteral(KHRONICLE_QML_DIR "/FleetMain.qml"));
     } else {
+        // Normal mode connects to the daemon's local JSON-RPC API.
         apiClient = std::make_unique<khronicle::KhronicleApiClient>();
         engine.rootContext()->setContextProperty(QStringLiteral("khronicleApi"),
                                                  apiClient.get());

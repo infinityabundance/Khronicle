@@ -17,6 +17,7 @@ public:
     explicit WatchClient(QObject *parent = nullptr);
     ~WatchClient() override;
 
+    // QML-facing methods to manage watch rules/signals via local JSON-RPC.
     Q_INVOKABLE void loadRules();
     Q_INVOKABLE void saveRule(const QVariantMap &rule);
     Q_INVOKABLE void deleteRule(const QString &id);

@@ -28,6 +28,7 @@ QString toIso8601Utc(const QDateTime &dt)
 KhronicleTray::KhronicleTray(QObject *parent)
     : QObject(parent)
 {
+    // Tray is intentionally lightweight: no DB access, only local JSON-RPC.
     setupTrayIcon();
     setupMenu();
     scheduleRefresh();
@@ -82,6 +83,7 @@ void KhronicleTray::scheduleRefresh()
 
 void KhronicleTray::refreshSummary()
 {
+    // Periodic refresh of today's summary and critical watchpoints for tooltip.
     m_lastSummaryText = requestSummarySinceToday();
     const int criticalSignals = requestCriticalWatchSignalsSinceToday();
     if (criticalSignals > 0) {
@@ -93,6 +95,7 @@ void KhronicleTray::refreshSummary()
 
 void KhronicleTray::showSummaryPopup()
 {
+    // On-demand popup for today's summary.
     if (m_lastSummaryText.isEmpty()) {
         refreshSummary();
     }
@@ -104,6 +107,7 @@ void KhronicleTray::showSummaryPopup()
 
 void KhronicleTray::showWatchSignalsPopup()
 {
+    // Simple textual list of the most recent watchpoint signals.
     const QString summary = requestWatchSignalsSinceToday();
     m_trayIcon.showMessage(QStringLiteral("Khronicle - Watchpoint Signals"),
                            summary,
@@ -125,6 +129,7 @@ void KhronicleTray::onTrayActivated(QSystemTrayIcon::ActivationReason reason)
 
 QString KhronicleTray::requestSummarySinceToday()
 {
+    // Query the daemon for summary_since starting at local midnight.
     QLocalSocket socket;
     socket.connectToServer(socketPath());
     if (!socket.waitForConnected(kSocketTimeoutMs)) {

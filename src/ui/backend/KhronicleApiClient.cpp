@@ -130,6 +130,7 @@ void KhronicleApiClient::onSocketReadyRead()
 void KhronicleApiClient::sendRequest(const QString &method,
                                     const QJsonObject &params)
 {
+    // Requests are newline-delimited JSON messages over a persistent local socket.
     if (m_socket->state() != QLocalSocket::ConnectedState) {
         connectToDaemon();
         emit errorOccurred(QStringLiteral("Not connected to Khronicle daemon"));
@@ -153,6 +154,7 @@ void KhronicleApiClient::sendRequest(const QString &method,
 
 void KhronicleApiClient::handleResponse(const QJsonObject &obj)
 {
+    // Match responses to requests by id and emit QML-friendly signals.
     const int id = obj.value("id").toInt(-1);
     if (!m_pending.contains(id)) {
         return;

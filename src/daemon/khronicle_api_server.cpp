@@ -124,6 +124,7 @@ void KhronicleApiServer::handleClientReadyRead()
 void KhronicleApiServer::handleRequest(QLocalSocket *socket,
                                        const QByteArray &payload)
 {
+    // JSON-RPC-style request handler. All requests are local-only via UNIX socket.
     const auto parsed = nlohmann::json::parse(payload.toStdString(), nullptr, false);
     if (parsed.is_discarded() || !parsed.is_object()) {
         const QByteArray response = makeErrorResponse("Invalid JSON payload");
@@ -160,6 +161,7 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
     }
 
     try {
+        // Each branch populates a JSON result object or returns an error response.
         if (method == "get_changes_since") {
             const std::string sinceValue = params.value("since", "");
             const auto since = fromIso8601Utc(sinceValue);

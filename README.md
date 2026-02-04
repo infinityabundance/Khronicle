@@ -1,127 +1,115 @@
 # Khronicle
-System and driver change timeline for KDE Plasma on CachyOS/ArchLinux
 
-## Running Khronicle
+Khronicle is a local, auditable system change chronicle for KDE Plasma on
+CachyOS/Arch-based systems. It records kernel, driver, firmware, and key package
+changes over time, then surfaces those changes through a timeline, snapshots,
+explanations, and watchpoints.
 
-### Starting the Khronicle daemon
+The project is built for explainability and trust. It does not enforce system
+policy or take automated actions. Instead, it captures what changed, when it
+changed, and how changes relate across time so that humans can reason about
+stability, regressions, and risk.
 
-Enable and start the user service:
+## Core Capabilities
+
+- Timeline of system changes (kernel, GPU, firmware, packages, system events)
+- Snapshots and diffs for point-in-time comparisons
+- Risk tagging and watchpoints (rule-based attention signals)
+- Temporal reasoning (explain change between two points)
+- Multi-host aggregation and Fleet mode (offline, file-based)
+- Reporting and export bundles (Markdown/JSON)
+
+## Components
+
+- `khronicle-daemon` — background ingestion, snapshotting, rules evaluation, and
+  local JSON-RPC API.
+- `khronicle` — the main GUI (Qt6/Kirigami) for timeline, diffs, explanations,
+  and watchpoints.
+- `khronicle-tray` — lightweight tray mini-viewer for “what changed today?”.
+- `khronicle-report` — CLI reporting, bundle export, and aggregation tools.
+
+## Installation
+
+Khronicle targets CachyOS / Arch-based systems with Qt6 and KDE Plasma 6.
+A sample PKGBUILD lives in `packaging/PKGBUILD`.
+
+To build manually:
 
 ```bash
-systemctl --user daemon-reload
-systemctl --user enable --now khronicle-daemon
+cmake -S . -B build
+cmake --build build
 ```
 
-(Optional) Enable tray autostart:
-
-```bash
-systemctl --user enable --now khronicle-tray
-```
-
-Check status:
-
-```bash
-systemctl --user status khronicle-daemon
-```
-
-## Packaging (Arch / CachyOS)
-
-A sample PKGBUILD is provided under `packaging/PKGBUILD`.
-
-To build and install:
+To install via the provided package:
 
 ```bash
 cd packaging
 makepkg -si
 ```
 
-This will install:
+## Running Khronicle
 
-`khronicle` (GUI)
-`khronicle-daemon` (background service)
-`khronicle-tray` (optional tray mini-viewer)
-
-.desktop launchers under `/usr/share/applications/`
-systemd user units under `/usr/share/systemd/user/`
-
-After installation, enable the daemon:
+Start the daemon (systemd user service):
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now khronicle-daemon.service
+systemctl --user enable --now khronicle-daemon
 ```
 
-(Optional) enable the tray:
+Start the GUI:
 
 ```bash
-systemctl --user enable --now khronicle-tray.service
+khronicle
 ```
 
-## Command-line reports
-
-Khronicle includes a small CLI tool `khronicle-report` for exporting reports.
-
-Examples:
+Optional tray mini-viewer:
 
 ```bash
-# Timeline for last 24h in Markdown
-khronicle-report timeline --from "2026-01-28T00:00:00Z" --to "2026-01-29T00:00:00Z" --format markdown > report.md
-
-# Snapshot diff as JSON
-khronicle-report diff --snapshot-a "snapshot-123" --snapshot-b "snapshot-456" --format json > diff.json
+systemctl --user enable --now khronicle-tray
 ```
 
-## Temporal Reasoning & Interpretation
-
-Khronicle offers temporal queries and explanations to help interpret change:
-
-- Recorded facts: events and snapshots at specific times
-- Derived diffs: comparisons between snapshots or ranges
-- Interpretive explanations: text summaries of likely contributors
-
-Explanations describe temporal correlation and plausibility, not causation.
-
-## Watchpoints & Local Rules
-
-Khronicle supports watchpoints: declarative checks that highlight specific kinds
-of change (for example, kernel updates outside a maintenance window, firmware
-changes more than once per week, or GPU driver downgrades).
-
-What watchpoints are:
-
-- Local, inspectable rules over events and snapshots
-- Simple, transparent match criteria (category, risk level, package name)
-- Attention aids that surface signals when conditions are met
-
-What watchpoints are not:
-
-- No automatic blocking or remediation
-- No remote alerting or outbound network notifications
-- No system policy enforcement
-
-Manage watchpoints in the Khronicle UI under "Watchpoints" (Rules and Signals).
-Rules are stored locally and evaluated after events/snapshots are recorded.
-
-## Multi-Host / Fleet Usage
-
-Khronicle supports offline, read-only aggregation across multiple hosts.
-
-Generate bundles on each machine:
+Run the report tool:
 
 ```bash
-khronicle-report bundle --from "2026-01-28T00:00:00Z" --to "2026-01-29T00:00:00Z" --out host-bundle.tar.gz
+khronicle-report timeline --from "2026-01-28T00:00:00Z" --to "2026-01-29T00:00:00Z" --format markdown
 ```
 
-Aggregate bundles on a review machine:
+## Key Workflows (Examples)
+
+- See what changed in the last week.
+- Compare system state today vs. last month.
+- Flag unexpected kernel or firmware changes via watchpoints.
+- Aggregate multiple hosts and review them in Fleet mode.
+
+## Architecture & Design
+
+For a deeper architecture walk-through:
+
+- `ARCHITECTURE.md` — software architecture and data flow
+- `SYSTEMS-ARCHITECTURE.md` — OS integration and service model
+- `CODE.md` — top-down codebase navigation guide
+
+## Trust & Scope
+
+Khronicle is a local recorder and explainer. It does not:
+
+- Enforce policy or block updates
+- Automatically remediate changes
+- Make causal claims about root cause
+- Send data over the network by default
+
+Its accuracy depends on the logs and snapshots it reads.
+
+## Contributing & Development
+
+Run tests with:
 
 ```bash
-khronicle-report aggregate --input /path/to/bundles --format json --out aggregate.json
+ctest --test-dir build
 ```
 
-Open Fleet Mode:
+See `CODE.md` for a guided tour of the codebase and key entry points.
 
-```bash
-khronicle --fleet aggregate.json
-```
+## License
 
-Fleet Mode is offline and read-only; no network sync or central server is required.
+See `LICENSE`.

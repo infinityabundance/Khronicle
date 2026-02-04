@@ -16,6 +16,8 @@ namespace khronicle {
 
 namespace {
 
+// pacman.log is append-only. We track a byte cursor so ingestion is incremental
+// and does not re-parse the entire file on each daemon cycle.
 // Cursor is a byte offset into pacman.log.
 std::streampos parseCursor(const std::optional<std::string> &cursor)
 {
@@ -76,6 +78,7 @@ struct ParsedLine {
 
 std::optional<ParsedLine> parseLine(const std::string &line)
 {
+    // Pacman log lines are structured; we only care about install/upgrade/downgrade.
     static const std::regex pattern(
         R"(^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2})\]\s+\[ALPM\]\s+"
         R"((installed|upgraded|downgraded)\s+([^\s]+)\s+\(([^\)]*)\))");
@@ -168,6 +171,7 @@ EventCategory categoryForPackage(const std::string &packageName)
 
 bool isInterestingPackage(const std::string &packageName)
 {
+    // Explicit list keeps ingestion focused on kernel/GPU/firmware changes.
     // Explicit list of interesting packages for now (kernels, GPU drivers, firmware).
     static const std::unordered_set<std::string> interesting{
         "linux",
@@ -197,6 +201,8 @@ bool isInterestingPackage(const std::string &packageName)
 PacmanParseResult parsePacmanLog(const std::string &path,
                                  const std::optional<std::string> &previousCursor)
 {
+    // Parse pacman.log from a prior cursor and emit KhronicleEvent records.
+    // If the log cannot be read, keep the previous cursor so we don't skip data.
     PacmanParseResult result;
 
     std::ifstream file(path);
