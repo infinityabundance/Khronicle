@@ -1,0 +1,45 @@
+pkgname=khronicle
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="System and driver change timeline for KDE Plasma"
+arch=('x86_64')
+url="https://github.com/infinityabundance/Khronicle"
+license=('Apache')
+depends=(
+  qt6-base
+  qt6-declarative
+  kirigami2
+  sqlite
+  nlohmann-json
+  systemd
+)
+makedepends=(
+  cmake
+  git
+  ninja
+)
+source=("$pkgname::git+https://github.com/infinityabundance/Khronicle.git")
+sha256sums=('SKIP')
+install=$pkgname.install
+
+pkgver() {
+  cd "$srcdir/$pkgname"
+  git describe --tags --always | sed 's/^v//; s/-/./g'
+}
+
+build() {
+  cd "$srcdir/$pkgname"
+  cmake -B build -S . \
+    -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build build
+}
+
+package() {
+  cd "$srcdir/$pkgname"
+  DESTDIR="$pkgdir" cmake --install build
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
