@@ -3,6 +3,9 @@
 #include <QDebug>
 
 #include "tray/KhronicleTray.hpp"
+#include "common/logging.hpp"
+
+#include <nlohmann/json.hpp>
 
 int main(int argc, char *argv[])
 {
@@ -14,6 +17,22 @@ int main(int argc, char *argv[])
     }
 
     app.setQuitOnLastWindowClosed(false);
+
+    bool codexTrace = qEnvironmentVariableIntValue("KHRONICLE_CODEX_TRACE") == 1;
+    for (int i = 1; i < argc; ++i) {
+        if (QString::fromLocal8Bit(argv[i]) == QStringLiteral("--codex-trace")) {
+            codexTrace = true;
+        }
+    }
+    khronicle::logging::initLogging(QStringLiteral("khronicle-tray"), codexTrace);
+    KLOG_INFO(QStringLiteral("main"),
+              QStringLiteral("main"),
+              QStringLiteral("tray_start"),
+              QStringLiteral("user_start"),
+              QStringLiteral("qt_app"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json::object());
 
     // Tray runs as a background UI with periodic daemon queries.
     KhronicleTray tray;

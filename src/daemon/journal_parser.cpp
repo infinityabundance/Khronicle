@@ -13,6 +13,9 @@
 
 #include <nlohmann/json.hpp>
 
+#include "common/json_utils.hpp"
+#include "common/logging.hpp"
+
 namespace khronicle {
 
 namespace {
@@ -125,6 +128,14 @@ JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since
     // Query journalctl incrementally, returning only events newer than "since".
     QProcess process;
     QString sinceArg = QStringLiteral("--since=%1").arg(toIsoSince(since));
+    KLOG_DEBUG(QStringLiteral("JournalParser"),
+               QStringLiteral("parseJournalSince"),
+               QStringLiteral("parse_journal_start"),
+               QStringLiteral("ingestion_cycle"),
+               QStringLiteral("journalctl"),
+               khronicle::logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"since", toIsoSince(since).toStdString()}});
     process.start(QStringLiteral("journalctl"),
                   {sinceArg, QStringLiteral("--output=short-iso")});
 
@@ -132,6 +143,14 @@ JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since
         // If journalctl cannot start, return empty events and keep lastTimestamp unchanged.
         JournalParseResult result;
         result.lastTimestamp = since;
+        KLOG_WARN(QStringLiteral("JournalParser"),
+                  QStringLiteral("parseJournalSince"),
+                  QStringLiteral("journalctl_start_failed"),
+                  QStringLiteral("ingestion_cycle"),
+                  QStringLiteral("journalctl"),
+                  khronicle::logging::defaultWho(),
+                  QString(),
+                  nlohmann::json::object());
         return result;
     }
 
@@ -141,12 +160,28 @@ JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since
         // If journalctl fails, return empty events and keep lastTimestamp unchanged.
         JournalParseResult result;
         result.lastTimestamp = since;
+        KLOG_WARN(QStringLiteral("JournalParser"),
+                  QStringLiteral("parseJournalSince"),
+                  QStringLiteral("journalctl_timeout"),
+                  QStringLiteral("ingestion_cycle"),
+                  QStringLiteral("journalctl"),
+                  khronicle::logging::defaultWho(),
+                  QString(),
+                  nlohmann::json::object());
         return result;
     }
 
     if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
         JournalParseResult result;
         result.lastTimestamp = since;
+        KLOG_WARN(QStringLiteral("JournalParser"),
+                  QStringLiteral("parseJournalSince"),
+                  QStringLiteral("journalctl_failed"),
+                  QStringLiteral("ingestion_cycle"),
+                  QStringLiteral("journalctl"),
+                  khronicle::logging::defaultWho(),
+                  QString(),
+                  nlohmann::json{{"exitCode", process.exitCode()}});
         return result;
     }
 
@@ -160,8 +195,11 @@ JournalParseResult parseJournalOutputLines(const QStringList &lines,
 {
     JournalParseResult result;
     result.lastTimestamp = since;
+    size_t processed = 0;
+    size_t produced = 0;
 
     for (const QString &line : lines) {
+        processed++;
         int space = line.indexOf(' ');
         if (space < 0) {
             continue;
@@ -245,6 +283,7 @@ JournalParseResult parseJournalOutputLines(const QStringList &lines,
         }
 
         result.events.push_back(std::move(event));
+        produced++;
 
         // Track the highest timestamp so callers can persist a resume point.
         if (*timestamp > result.lastTimestamp) {
@@ -252,6 +291,16 @@ JournalParseResult parseJournalOutputLines(const QStringList &lines,
         }
     }
 
+    KLOG_INFO(QStringLiteral("JournalParser"),
+              QStringLiteral("parseJournalOutputLines"),
+              QStringLiteral("parse_journal_complete"),
+              QStringLiteral("ingestion_cycle"),
+              QStringLiteral("journalctl"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"lines", processed},
+                             {"events", produced},
+                             {"lastTimestamp", toIso8601Utc(result.lastTimestamp)}});
     return result;
 }
 

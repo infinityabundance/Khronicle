@@ -13,6 +13,10 @@
 
 #include <unistd.h>
 
+#include <nlohmann/json.hpp>
+
+#include "common/logging.hpp"
+
 namespace {
 
 constexpr int kRefreshIntervalMs = 15 * 60 * 1000;
@@ -29,6 +33,14 @@ KhronicleTray::KhronicleTray(QObject *parent)
     : QObject(parent)
 {
     // Tray is intentionally lightweight: no DB access, only local JSON-RPC.
+    KLOG_INFO(QStringLiteral("KhronicleTray"),
+              QStringLiteral("KhronicleTray"),
+              QStringLiteral("tray_start"),
+              QStringLiteral("user_start"),
+              QStringLiteral("tray"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json::object());
     setupTrayIcon();
     setupMenu();
     scheduleRefresh();
@@ -84,6 +96,14 @@ void KhronicleTray::scheduleRefresh()
 void KhronicleTray::refreshSummary()
 {
     // Periodic refresh of today's summary and critical watchpoints for tooltip.
+    KLOG_DEBUG(QStringLiteral("KhronicleTray"),
+               QStringLiteral("refreshSummary"),
+               QStringLiteral("fetch_today_summary"),
+               QStringLiteral("timer_tick"),
+               QStringLiteral("json_rpc"),
+               khronicle::logging::defaultWho(),
+               QString(),
+               nlohmann::json::object());
     m_lastSummaryText = requestSummarySinceToday();
     const int criticalSignals = requestCriticalWatchSignalsSinceToday();
     if (criticalSignals > 0) {
@@ -100,6 +120,14 @@ void KhronicleTray::showSummaryPopup()
         refreshSummary();
     }
 
+    KLOG_INFO(QStringLiteral("KhronicleTray"),
+              QStringLiteral("showSummaryPopup"),
+              QStringLiteral("show_summary_popup"),
+              QStringLiteral("user_action"),
+              QStringLiteral("tray_popup"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json::object());
     m_trayIcon.showMessage(QStringLiteral("Khronicle - Today's Changes"),
                            m_lastSummaryText,
                            QSystemTrayIcon::Information);
@@ -108,6 +136,14 @@ void KhronicleTray::showSummaryPopup()
 void KhronicleTray::showWatchSignalsPopup()
 {
     // Simple textual list of the most recent watchpoint signals.
+    KLOG_INFO(QStringLiteral("KhronicleTray"),
+              QStringLiteral("showWatchSignalsPopup"),
+              QStringLiteral("show_watch_signals_popup"),
+              QStringLiteral("user_action"),
+              QStringLiteral("tray_popup"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json::object());
     const QString summary = requestWatchSignalsSinceToday();
     m_trayIcon.showMessage(QStringLiteral("Khronicle - Watchpoint Signals"),
                            summary,
@@ -116,6 +152,14 @@ void KhronicleTray::showWatchSignalsPopup()
 
 void KhronicleTray::openFullApp()
 {
+    KLOG_INFO(QStringLiteral("KhronicleTray"),
+              QStringLiteral("openFullApp"),
+              QStringLiteral("open_full_app"),
+              QStringLiteral("user_action"),
+              QStringLiteral("process_start"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json::object());
     QProcess::startDetached(QStringLiteral("khronicle"));
 }
 

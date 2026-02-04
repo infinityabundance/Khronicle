@@ -11,6 +11,7 @@
 #include "daemon/snapshot_builder.hpp"
 #include "daemon/watch_engine.hpp"
 #include "common/json_utils.hpp"
+#include "common/logging.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -77,6 +78,15 @@ void KhronicleDaemon::start()
         m_apiServer->start();
     }
 
+    KLOG_INFO(QStringLiteral("KhronicleDaemon"),
+              QStringLiteral("start"),
+              QStringLiteral("daemon_start"),
+              QStringLiteral("user_start"),
+              QStringLiteral("timer_loop"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"intervalMs", kIngestionIntervalMs}});
+
     // Timer-driven ingestion loop: keep work bounded and predictable.
     auto *timer = new QTimer(this);
     timer->setInterval(kIngestionIntervalMs);
@@ -93,55 +103,127 @@ void KhronicleDaemon::runIngestionCycle()
     // 2) journal ingestion
     // 3) snapshot check + optional event emission
     // 4) persist resume state to the meta table
+    const auto cycleStart = std::chrono::steady_clock::now();
+    static uint64_t cycleIndex = 0;
+    const QString corrId = QStringLiteral("ingestion-%1").arg(++cycleIndex);
+    khronicle::logging::CorrelationScope corrScope(corrId);
+    KLOG_INFO(QStringLiteral("KhronicleDaemon"),
+              QStringLiteral("runIngestionCycle"),
+              QStringLiteral("start_ingestion_cycle"),
+              QStringLiteral("timer_tick"),
+              QStringLiteral("bounded_batch"),
+              khronicle::logging::defaultWho(),
+              corrId,
+              nlohmann::json{{"cycleIndex", cycleIndex}});
+
     runPacmanIngestion();
     runJournalIngestion();
     runSnapshotCheck();
     persistStateToMeta();
+
+    const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - cycleStart).count();
+    KLOG_INFO(QStringLiteral("KhronicleDaemon"),
+              QStringLiteral("runIngestionCycle"),
+              QStringLiteral("end_ingestion_cycle"),
+              QStringLiteral("timer_tick"),
+              QStringLiteral("bounded_batch"),
+              khronicle::logging::defaultWho(),
+              corrId,
+              nlohmann::json{{"durationMs", elapsedMs}});
 }
 
 void KhronicleDaemon::runPacmanIngestion()
 {
     // Parse new pacman log entries from the last cursor.
+    KLOG_DEBUG(QStringLiteral("KhronicleDaemon"),
+               QStringLiteral("runPacmanIngestion"),
+               QStringLiteral("ingest_pacman_start"),
+               QStringLiteral("ingestion_cycle"),
+               QStringLiteral("parse_log"),
+               khronicle::logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"cursor", m_pacmanCursor.value_or("")}});
     const PacmanParseResult result =
         parsePacmanLog("/var/log/pacman.log", m_pacmanCursor);
 
     const std::string hostId = m_store->getHostIdentity().hostId;
+    size_t ingested = 0;
     for (auto event : result.events) {
         event.hostId = hostId;
         m_store->addEvent(event);
         if (m_watchEngine) {
             m_watchEngine->evaluateEvent(event);
         }
+        ingested++;
     }
 
     if (!result.newCursor.empty()) {
         m_pacmanCursor = result.newCursor;
     }
+
+    KLOG_INFO(QStringLiteral("KhronicleDaemon"),
+              QStringLiteral("runPacmanIngestion"),
+              QStringLiteral("ingest_pacman_complete"),
+              QStringLiteral("ingestion_cycle"),
+              QStringLiteral("parse_log"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"events", ingested},
+                             {"newCursor", result.newCursor}});
 }
 
 void KhronicleDaemon::runJournalIngestion()
 {
     // Parse journal entries since the last observed timestamp.
+    KLOG_DEBUG(QStringLiteral("KhronicleDaemon"),
+               QStringLiteral("runJournalIngestion"),
+               QStringLiteral("ingest_journal_start"),
+               QStringLiteral("ingestion_cycle"),
+               QStringLiteral("journalctl"),
+               khronicle::logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"since", toIso8601Utc(m_journalLastTimestamp)}});
     const JournalParseResult result = parseJournalSince(m_journalLastTimestamp);
 
     const std::string hostId = m_store->getHostIdentity().hostId;
+    size_t ingested = 0;
     for (auto event : result.events) {
         event.hostId = hostId;
         m_store->addEvent(event);
         if (m_watchEngine) {
             m_watchEngine->evaluateEvent(event);
         }
+        ingested++;
     }
 
     if (result.lastTimestamp > m_journalLastTimestamp) {
         m_journalLastTimestamp = result.lastTimestamp;
     }
+
+    KLOG_INFO(QStringLiteral("KhronicleDaemon"),
+              QStringLiteral("runJournalIngestion"),
+              QStringLiteral("ingest_journal_complete"),
+              QStringLiteral("ingestion_cycle"),
+              QStringLiteral("journalctl"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"events", ingested},
+                             {"lastTimestamp", toIso8601Utc(result.lastTimestamp)}});
 }
 
 void KhronicleDaemon::runSnapshotCheck()
 {
     // Snapshot builder captures point-in-time system state. We only write a new
     // snapshot when kernel changes (current heuristic).
+    KLOG_DEBUG(QStringLiteral("KhronicleDaemon"),
+               QStringLiteral("runSnapshotCheck"),
+               QStringLiteral("snapshot_check_start"),
+               QStringLiteral("ingestion_cycle"),
+               QStringLiteral("kernel_change_heuristic"),
+               khronicle::logging::defaultWho(),
+               QString(),
+               nlohmann::json::object());
     SystemSnapshot current = buildCurrentSnapshot();
     current.hostIdentity = m_store->getHostIdentity();
 
@@ -151,10 +233,26 @@ void KhronicleDaemon::runSnapshotCheck()
             m_watchEngine->evaluateSnapshot(current);
         }
         m_lastSnapshot = current;
+        KLOG_INFO(QStringLiteral("KhronicleDaemon"),
+                  QStringLiteral("runSnapshotCheck"),
+                  QStringLiteral("snapshot_inserted"),
+                  QStringLiteral("initial_snapshot"),
+                  QStringLiteral("kernel_change_heuristic"),
+                  khronicle::logging::defaultWho(),
+                  QString(),
+                  nlohmann::json{{"snapshotId", current.id}});
         return;
     }
 
     if (m_lastSnapshot->kernelVersion == current.kernelVersion) {
+        KLOG_DEBUG(QStringLiteral("KhronicleDaemon"),
+                   QStringLiteral("runSnapshotCheck"),
+                   QStringLiteral("snapshot_skipped"),
+                   QStringLiteral("kernel_unchanged"),
+                   QStringLiteral("kernel_change_heuristic"),
+                   khronicle::logging::defaultWho(),
+                   QString(),
+                   nlohmann::json{{"kernelVersion", current.kernelVersion}});
         return;
     }
 
@@ -186,6 +284,16 @@ void KhronicleDaemon::runSnapshotCheck()
     if (m_watchEngine) {
         m_watchEngine->evaluateEvent(event);
     }
+    KLOG_INFO(QStringLiteral("KhronicleDaemon"),
+              QStringLiteral("runSnapshotCheck"),
+              QStringLiteral("snapshot_inserted"),
+              QStringLiteral("kernel_changed"),
+              QStringLiteral("kernel_change_heuristic"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"snapshotId", current.id},
+                             {"kernelFrom", m_lastSnapshot->kernelVersion},
+                             {"kernelTo", current.kernelVersion}});
     m_lastSnapshot = current;
 }
 

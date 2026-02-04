@@ -12,6 +12,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "common/logging.hpp"
+
 namespace khronicle {
 
 namespace {
@@ -205,10 +207,28 @@ PacmanParseResult parsePacmanLog(const std::string &path,
     // If the log cannot be read, keep the previous cursor so we don't skip data.
     PacmanParseResult result;
 
+    KLOG_DEBUG(QStringLiteral("PacmanParser"),
+               QStringLiteral("parsePacmanLog"),
+               QStringLiteral("parse_pacman_log"),
+               QStringLiteral("ingestion_cycle"),
+               QStringLiteral("incremental_cursor"),
+               khronicle::logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"path", path},
+                              {"cursor", previousCursor.value_or("")}});
+
     std::ifstream file(path);
     if (!file.is_open()) {
         // If the log can't be opened, keep the previous cursor so we don't skip data.
         result.newCursor = previousCursor.value_or("0");
+        KLOG_WARN(QStringLiteral("PacmanParser"),
+                  QStringLiteral("parsePacmanLog"),
+                  QStringLiteral("pacman_log_open_failed"),
+                  QStringLiteral("ingestion_cycle"),
+                  QStringLiteral("file_open"),
+                  khronicle::logging::defaultWho(),
+                  QString(),
+                  nlohmann::json{{"path", path}});
         return result;
     }
 
@@ -268,6 +288,15 @@ PacmanParseResult parsePacmanLog(const std::string &path,
         result.newCursor = std::to_string(static_cast<long long>(endPos));
     }
 
+    KLOG_INFO(QStringLiteral("PacmanParser"),
+              QStringLiteral("parsePacmanLog"),
+              QStringLiteral("parse_pacman_log_complete"),
+              QStringLiteral("ingestion_cycle"),
+              QStringLiteral("incremental_cursor"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"events", result.events.size()},
+                             {"newCursor", result.newCursor}});
     return result;
 }
 

@@ -7,10 +7,12 @@
 #include <QFile>
 #include <QStandardPaths>
 #include <QDebug>
+#include <QUuid>
 
 #include <unistd.h>
 
 #include "common/json_utils.hpp"
+#include "common/logging.hpp"
 #include "daemon/counterfactual.hpp"
 
 namespace khronicle {
@@ -125,8 +127,18 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
                                        const QByteArray &payload)
 {
     // JSON-RPC-style request handler. All requests are local-only via UNIX socket.
+    const QString corrId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    khronicle::logging::CorrelationScope corrScope(corrId);
     const auto parsed = nlohmann::json::parse(payload.toStdString(), nullptr, false);
     if (parsed.is_discarded() || !parsed.is_object()) {
+        KLOG_WARN(QStringLiteral("KhronicleApiServer"),
+                  QStringLiteral("handleRequest"),
+                  QStringLiteral("api_request_error"),
+                  QStringLiteral("parse_payload"),
+                  QStringLiteral("json_parse"),
+                  khronicle::logging::defaultWho(),
+                  corrId,
+                  nlohmann::json::object());
         const QByteArray response = makeErrorResponse("Invalid JSON payload");
         socket->write(response);
         socket->flush();
@@ -140,6 +152,14 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
     }
 
     if (!parsed.contains("method") || !parsed["method"].is_string()) {
+        KLOG_WARN(QStringLiteral("KhronicleApiServer"),
+                  QStringLiteral("handleRequest"),
+                  QStringLiteral("api_request_error"),
+                  QStringLiteral("missing_method"),
+                  QStringLiteral("json_parse"),
+                  khronicle::logging::defaultWho(),
+                  corrId,
+                  nlohmann::json::object());
         const QByteArray response = makeErrorResponse("Missing method", id);
         socket->write(response);
         socket->flush();
@@ -160,6 +180,23 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
         params = parsed["params"];
     }
 
+    nlohmann::json paramKeys = nlohmann::json::array();
+    if (params.is_object()) {
+        for (auto it = params.begin(); it != params.end(); ++it) {
+            paramKeys.push_back(it.key());
+        }
+    }
+    KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+              QStringLiteral("handleRequest"),
+              QStringLiteral("api_request_received"),
+              QStringLiteral("client_call"),
+              QStringLiteral("json_rpc"),
+              khronicle::logging::defaultWho(),
+              corrId,
+              nlohmann::json{{"method", method},
+                             {"paramKeys", paramKeys}});
+
+    auto start = std::chrono::steady_clock::now();
     try {
         // Each branch populates a JSON result object or returns an error response.
         if (method == "get_changes_since") {
@@ -178,6 +215,17 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             result["events"] = events;
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+            KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_completed"),
+                      QStringLiteral("client_call"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method},
+                                     {"durationMs",
+                                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now() - start).count()}});
         } else if (method == "get_changes_between") {
             const std::string fromValue = params.value("from", "");
             const std::string toValue = params.value("to", "");
@@ -197,12 +245,34 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             result["events"] = events;
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+            KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_completed"),
+                      QStringLiteral("client_call"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method},
+                                     {"durationMs",
+                                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now() - start).count()}});
         } else if (method == "list_snapshots") {
             const auto snapshots = m_store.listSnapshots();
             nlohmann::json result;
             result["snapshots"] = snapshots;
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+            KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_completed"),
+                      QStringLiteral("client_call"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method},
+                                     {"durationMs",
+                                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now() - start).count()}});
         } else if (method == "get_snapshot") {
             const std::string snapshotId = params.value("id", "");
             if (snapshotId.empty()) {
@@ -224,6 +294,17 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             result["snapshot"] = *snapshot;
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+            KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_completed"),
+                      QStringLiteral("client_call"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method},
+                                     {"durationMs",
+                                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now() - start).count()}});
         } else if (method == "diff_snapshots") {
             const std::string aId = params.value("a", "");
             const std::string bId = params.value("b", "");
@@ -239,6 +320,17 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             result["diff"] = diff;
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+            KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_completed"),
+                      QStringLiteral("client_call"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method},
+                                     {"durationMs",
+                                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now() - start).count()}});
         } else if (method == "summary_since") {
             // INVARIANT: Summaries are interpretations derived from stored facts.
             const std::string sinceValue = params.value("since", "");
@@ -293,12 +385,34 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
 
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+            KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_completed"),
+                      QStringLiteral("client_call"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method},
+                                     {"durationMs",
+                                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now() - start).count()}});
         } else if (method == "list_watch_rules") {
             const auto rules = m_store.listWatchRules();
             nlohmann::json result;
             result["rules"] = rules;
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+            KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_completed"),
+                      QStringLiteral("client_call"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method},
+                                     {"durationMs",
+                                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now() - start).count()}});
         } else if (method == "upsert_watch_rule") {
             if (!params.contains("rule") || !params["rule"].is_object()) {
                 const QByteArray response = makeErrorResponse("Missing rule object", id);
@@ -320,6 +434,17 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             result["ok"] = true;
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+            KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_completed"),
+                      QStringLiteral("client_call"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method},
+                                     {"durationMs",
+                                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now() - start).count()}});
         } else if (method == "delete_watch_rule") {
             const std::string ruleId = params.value("id", "");
             if (ruleId.empty()) {
@@ -334,6 +459,17 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             result["ok"] = true;
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+            KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_completed"),
+                      QStringLiteral("client_call"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method},
+                                     {"durationMs",
+                                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now() - start).count()}});
         } else if (method == "get_watch_signals_since") {
             const std::string sinceValue = params.value("since", "");
             const auto since = fromIso8601Utc(sinceValue);
@@ -349,6 +485,17 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             result["signals"] = signals;
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+            KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_completed"),
+                      QStringLiteral("client_call"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method},
+                                     {"durationMs",
+                                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now() - start).count()}});
         } else if (method == "explain_change_between") {
             // INVARIANT: Explanations are interpretive, not causal assertions.
             const std::string fromValue = params.value("from", "");
@@ -386,6 +533,17 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
 
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+            KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_completed"),
+                      QStringLiteral("client_call"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method},
+                                     {"durationMs",
+                                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now() - start).count()}});
         } else if (method == "what_changed_since_last_good") {
             const std::string referenceId = params.value("referenceSnapshotId", "");
             if (referenceId.empty()) {
@@ -419,11 +577,38 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
 
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+            KLOG_INFO(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_completed"),
+                      QStringLiteral("client_call"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method},
+                                     {"durationMs",
+                                      std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::steady_clock::now() - start).count()}});
         } else {
+            KLOG_WARN(QStringLiteral("KhronicleApiServer"),
+                      QStringLiteral("handleRequest"),
+                      QStringLiteral("api_request_error"),
+                      QStringLiteral("unknown_method"),
+                      QStringLiteral("json_rpc"),
+                      khronicle::logging::defaultWho(),
+                      corrId,
+                      nlohmann::json{{"method", method}});
             const QByteArray response = makeErrorResponse("Unknown method", id);
             socket->write(response);
         }
     } catch (const std::exception &ex) {
+        KLOG_ERROR(QStringLiteral("KhronicleApiServer"),
+                   QStringLiteral("handleRequest"),
+                   QStringLiteral("api_request_error"),
+                   QStringLiteral("exception"),
+                   QStringLiteral("json_rpc"),
+                   khronicle::logging::defaultWho(),
+                   corrId,
+                   nlohmann::json{{"what", ex.what()}});
         const QByteArray response = makeErrorResponse(ex.what(), id);
         socket->write(response);
     }
