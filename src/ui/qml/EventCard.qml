@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
@@ -72,6 +73,33 @@ Kirigami.AbstractListItem {
                         visible: (root.eventData.riskLevel || "") === "important"
                         text: "Important"
                         opacity: 0.8
+                    }
+
+                    Item {
+                        visible: root.eventData.provenance !== undefined
+                        width: Kirigami.Units.iconSizes.smallMedium
+                        height: Kirigami.Units.iconSizes.smallMedium
+
+                        Kirigami.Icon {
+                            anchors.fill: parent
+                            source: "help-about"
+                        }
+
+                        HoverHandler {
+                            id: provenanceHover
+                        }
+
+                        ToolTip.visible: provenanceHover.hovered
+                        ToolTip.text: {
+                            if (!root.eventData.provenance) {
+                                return ""
+                            }
+                            const prov = root.eventData.provenance
+                            return "Source: " + (prov.sourceType || "unknown") + "\\n"
+                                + "Ref: " + (prov.sourceRef || "") + "\\n"
+                                + "Parser: " + (prov.parserVersion || "") + "\\n"
+                                + "Ingestion: " + (prov.ingestionId || "")
+                        }
                     }
 
                     Kirigami.Label {

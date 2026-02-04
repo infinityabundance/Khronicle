@@ -69,6 +69,9 @@ khronicle-report timeline --from "2026-01-28T00:00:00Z" --to "2026-01-29T00:00:0
 
 # Snapshot diff as JSON
 khronicle-report diff --snapshot-a "snapshot-123" --snapshot-b "snapshot-456" --format json > diff.json
+
+# Reproducible bundle export
+khronicle-report bundle --from "2026-01-28T00:00:00Z" --to "2026-01-29T00:00:00Z" --out bundle.tar.gz
 ```
 
 ## Stability & Guarantees
@@ -97,3 +100,16 @@ Khronicle applies transparent, rule-based risk tagging to events:
 - `critical`: kernel version changes
 
 Risk metadata is included in JSON exports and surfaced in the timeline UI.
+
+## Auditability & Trust Model
+
+Khronicle distinguishes between facts and interpretations:
+
+- Facts: raw events and snapshots captured from pacman logs, journalctl, and system probes.
+- Interpretations: risk tags and snapshot diffs derived from those facts.
+
+Every event carries provenance (source, parser version, ingestion cycle). Derived
+conclusions are logged in an audit trail to make reasoning reproducible.
+
+Khronicle does not provide tamper-proofing or a root of trust; it is designed for
+transparent, explainable diagnostics rather than forensic guarantees.

@@ -160,7 +160,13 @@ inline void to_json(nlohmann::json &j, const KhronicleEvent &event)
         {"afterState", event.afterState},
         {"relatedPackages", event.relatedPackages},
         {"riskLevel", event.riskLevel.empty() ? "info" : event.riskLevel},
-        {"riskReason", event.riskReason}
+        {"riskReason", event.riskReason},
+        {"provenance", nlohmann::json{
+            {"sourceType", event.provenance.sourceType},
+            {"sourceRef", event.provenance.sourceRef},
+            {"parserVersion", event.provenance.parserVersion},
+            {"ingestionId", event.provenance.ingestionId}
+        }}
     };
 }
 
@@ -197,6 +203,18 @@ inline void from_json(const nlohmann::json &j, KhronicleEvent &event)
     }
     event.riskLevel = j.value("riskLevel", "info");
     event.riskReason = j.value("riskReason", "");
+    if (j.contains("provenance") && j.at("provenance").is_object()) {
+        const auto &prov = j.at("provenance");
+        event.provenance.sourceType = prov.value("sourceType", "unknown");
+        event.provenance.sourceRef = prov.value("sourceRef", "");
+        event.provenance.parserVersion = prov.value("parserVersion", "legacy");
+        event.provenance.ingestionId = prov.value("ingestionId", "");
+    } else {
+        event.provenance.sourceType = "unknown";
+        event.provenance.sourceRef.clear();
+        event.provenance.parserVersion = "legacy";
+        event.provenance.ingestionId.clear();
+    }
 }
 
 inline void to_json(nlohmann::json &j, const SystemSnapshot &snapshot)
@@ -207,7 +225,10 @@ inline void to_json(nlohmann::json &j, const SystemSnapshot &snapshot)
         {"kernelVersion", snapshot.kernelVersion},
         {"gpuDriver", snapshot.gpuDriver},
         {"firmwareVersions", snapshot.firmwareVersions},
-        {"keyPackages", snapshot.keyPackages}
+        {"keyPackages", snapshot.keyPackages},
+        {"snapshotId", snapshot.snapshotId},
+        {"ingestionId", snapshot.ingestionId},
+        {"kernelSource", snapshot.kernelSource}
     };
 }
 
@@ -231,6 +252,35 @@ inline void from_json(const nlohmann::json &j, SystemSnapshot &snapshot)
     } else {
         snapshot.keyPackages = nlohmann::json::object();
     }
+    snapshot.snapshotId = j.value("snapshotId", snapshot.id);
+    snapshot.ingestionId = j.value("ingestionId", "");
+    snapshot.kernelSource = j.value("kernelSource", "");
+}
+
+inline void to_json(nlohmann::json &j, const AuditLogEntry &entry)
+{
+    j = nlohmann::json{
+        {"id", entry.id},
+        {"timestamp", toIso8601Utc(entry.timestamp)},
+        {"auditType", entry.auditType},
+        {"inputRefs", entry.inputRefs},
+        {"method", entry.method},
+        {"outputSummary", entry.outputSummary}
+    };
+}
+
+inline void from_json(const nlohmann::json &j, AuditLogEntry &entry)
+{
+    entry.id = j.value("id", "");
+    entry.timestamp = fromIso8601Utc(j.value("timestamp", ""));
+    entry.auditType = j.value("auditType", "");
+    if (j.contains("inputRefs") && j.at("inputRefs").is_array()) {
+        entry.inputRefs = j.at("inputRefs").get<std::vector<std::string>>();
+    } else {
+        entry.inputRefs.clear();
+    }
+    entry.method = j.value("method", "");
+    entry.outputSummary = j.value("outputSummary", "");
 }
 
 inline void to_json(nlohmann::json &j, const KhronicleDiff::ChangedField &field)

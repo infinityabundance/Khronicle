@@ -4,7 +4,13 @@
 #include <iostream>
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QProcess>
+#include <QSysInfo>
+#include <QTemporaryDir>
 
 #include "common/khronicle_version.hpp"
 #include "common/json_utils.hpp"
@@ -21,7 +27,8 @@ QString usageText()
         "Khronicle-Report " KHRONICLE_VERSION "\n"
         "Usage:\n"
         "  khronicle-report timeline --from ISO --to ISO [--format markdown|json]\n"
-        "  khronicle-report diff --snapshot-a ID --snapshot-b ID [--format markdown|json]\n");
+        "  khronicle-report diff --snapshot-a ID --snapshot-b ID [--format markdown|json]\n"
+        "  khronicle-report bundle --from ISO --to ISO --out PATH\n");
 }
 
 QString humanizePath(const std::string &path)
@@ -171,6 +178,19 @@ QString getFormat(const QStringList &args)
     return value.toLower();
 }
 
+bool writeJsonFile(const QString &path, const nlohmann::json &payload)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        return false;
+    }
+    const QByteArray data = QByteArray::fromStdString(payload.dump(2));
+    if (file.write(data) != data.size()) {
+        return false;
+    }
+    return true;
+}
+
 } // namespace
 
 int ReportCli::run(int argc, char *argv[])
@@ -193,6 +213,9 @@ int ReportCli::run(int argc, char *argv[])
     }
     if (command == QStringLiteral("diff")) {
         return runDiffReport(args);
+    }
+    if (command == QStringLiteral("bundle")) {
+        return runBundleReport(args);
     }
 
     std::cerr << "Khronicle-Report: unknown command.\n";
@@ -276,6 +299,115 @@ int ReportCli::runDiffReport(const QStringList &args)
             renderDiffJson(diff, &*snapshotA, &*snapshotB);
         } else {
             renderDiffMarkdown(diff, &*snapshotA, &*snapshotB);
+        }
+    } catch (const std::exception &ex) {
+        std::cerr << "Khronicle-Report: failed to open database: " << ex.what()
+                  << "\n";
+        return 1;
+    }
+
+    return 0;
+}
+
+int ReportCli::runBundleReport(const QStringList &args)
+{
+    const QString fromValue = getArgValue(args, QStringLiteral("--from"));
+    const QString toValue = getArgValue(args, QStringLiteral("--to"));
+    const QString outPath = getArgValue(args, QStringLiteral("--out"));
+
+    if (fromValue.isEmpty() || toValue.isEmpty() || outPath.isEmpty()) {
+        std::cerr << "Khronicle-Report: missing --from/--to/--out.\n";
+        std::cerr << usageText().toStdString();
+        return 1;
+    }
+
+    const auto from = parseIso8601(fromValue);
+    const auto to = parseIso8601(toValue);
+    if (!from.has_value() || !to.has_value()) {
+        std::cerr << "Khronicle-Report: invalid ISO8601 timestamp.\n";
+        return 1;
+    }
+
+    try {
+        KhronicleStore store;
+        const auto events = store.getEventsBetween(*from, *to);
+        const auto snapshots = store.listSnapshots();
+        const auto auditLog = store.getAuditLogSince(*from, std::nullopt);
+
+        std::vector<SystemSnapshot> filteredSnapshots;
+        for (const auto &snapshot : snapshots) {
+            if (snapshot.timestamp >= *from && snapshot.timestamp <= *to) {
+                filteredSnapshots.push_back(snapshot);
+            }
+        }
+        std::sort(filteredSnapshots.begin(), filteredSnapshots.end(),
+                  [](const SystemSnapshot &a, const SystemSnapshot &b) {
+                      return a.timestamp < b.timestamp;
+                  });
+
+        std::vector<KhronicleDiff> diffs;
+        for (size_t i = 1; i < filteredSnapshots.size(); ++i) {
+            diffs.push_back(store.diffSnapshots(filteredSnapshots[i - 1].id,
+                                                filteredSnapshots[i].id));
+        }
+
+        nlohmann::json metadata;
+        metadata["version"] = KHRONICLE_VERSION;
+        metadata["exportTimestamp"] =
+            QDateTime::currentDateTimeUtc().toString(Qt::ISODate).toStdString();
+        metadata["hostKernel"] = QSysInfo::kernelVersion().toStdString();
+        metadata["schemaHash"] = QCryptographicHash::hash(
+                                     QByteArray::fromStdString(store.schemaSql()),
+                                     QCryptographicHash::Sha256)
+                                     .toHex()
+                                     .toStdString();
+        metadata["tools"] = {
+            {"riskClassifier", "RiskClassifier@1"},
+            {"snapshotDiffer", "SnapshotDiffer@1"}
+        };
+
+        QTemporaryDir tempDir;
+        if (!tempDir.isValid()) {
+            std::cerr << "Khronicle-Report: failed to create temp directory.\n";
+            return 1;
+        }
+
+        const QString bundleRoot = tempDir.path() + QDir::separator() + "bundle";
+        if (!QDir().mkpath(bundleRoot)) {
+            std::cerr << "Khronicle-Report: failed to create bundle directory.\n";
+            return 1;
+        }
+
+        if (!writeJsonFile(bundleRoot + QDir::separator() + "metadata.json",
+                           metadata)
+            || !writeJsonFile(bundleRoot + QDir::separator() + "events.json",
+                              nlohmann::json(events))
+            || !writeJsonFile(bundleRoot + QDir::separator() + "snapshots.json",
+                              nlohmann::json(filteredSnapshots))
+            || !writeJsonFile(bundleRoot + QDir::separator() + "diffs.json",
+                              nlohmann::json(diffs))
+            || !writeJsonFile(bundleRoot + QDir::separator() + "audit_log.json",
+                              nlohmann::json(auditLog))) {
+            std::cerr << "Khronicle-Report: failed to write bundle files.\n";
+            return 1;
+        }
+
+        QFile::remove(outPath);
+        QProcess tar;
+        tar.start(QStringLiteral("tar"),
+                  {QStringLiteral("-czf"),
+                   outPath,
+                   QStringLiteral("-C"),
+                   tempDir.path(),
+                   QStringLiteral("bundle")});
+
+        if (!tar.waitForStarted() || !tar.waitForFinished()) {
+            std::cerr << "Khronicle-Report: failed to create bundle archive.\n";
+            return 1;
+        }
+        if (tar.exitStatus() != QProcess::NormalExit || tar.exitCode() != 0) {
+            std::cerr << "Khronicle-Report: tar failed to create bundle.\n";
+            return 1;
         }
     } catch (const std::exception &ex) {
         std::cerr << "Khronicle-Report: failed to open database: " << ex.what()

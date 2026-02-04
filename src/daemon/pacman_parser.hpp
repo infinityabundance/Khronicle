@@ -8,6 +8,8 @@
 
 namespace khronicle {
 
+constexpr const char *PACMAN_PARSER_VERSION = "pacman_parser@1";
+
 struct PacmanParseResult {
     std::vector<KhronicleEvent> events;
     // Cursor is a string-encoded file offset; the daemon will store this in the meta table.

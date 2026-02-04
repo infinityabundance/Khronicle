@@ -1,5 +1,6 @@
 add_executable(test_store
     test_store.cpp
+    ../src/daemon/risk_classifier.cpp
 )
 
 target_include_directories(test_store

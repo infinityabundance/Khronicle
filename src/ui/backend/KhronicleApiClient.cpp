@@ -243,6 +243,10 @@ QVariantList KhronicleApiClient::convertEventsJsonToVariantList(
             event["riskReason"] = obj.value("riskReason").toString();
         }
 
+        if (obj.contains("provenance") && obj.value("provenance").isObject()) {
+            event["provenance"] = obj.value("provenance").toObject().toVariantMap();
+        }
+
         events.push_back(event);
     }
 

@@ -9,6 +9,8 @@
 
 namespace khronicle {
 
+constexpr const char *JOURNAL_PARSER_VERSION = "journal_parser@1";
+
 struct JournalParseResult {
     std::vector<KhronicleEvent> events;
     // The timestamp of the last processed journal entry, or the input 'since' if none were found.

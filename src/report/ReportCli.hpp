@@ -17,6 +17,7 @@ public:
 private:
     int runTimelineReport(const QStringList &args);
     int runDiffReport(const QStringList &args);
+    int runBundleReport(const QStringList &args);
 
     std::optional<std::chrono::system_clock::time_point> parseIso8601(
         const QString &value) const;

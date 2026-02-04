@@ -5,6 +5,7 @@
 
 #include <QTimer>
 #include <QDebug>
+#include <QUuid>
 
 #include "daemon/khronicle_api_server.hpp"
 #include "daemon/journal_parser.hpp"
@@ -96,6 +97,9 @@ void KhronicleDaemon::runIngestionCycle()
         return;
     }
 
+    m_currentIngestionId =
+        QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+
     const auto cycleStart = std::chrono::steady_clock::now();
 
     runPacmanIngestion();
@@ -127,8 +131,17 @@ void KhronicleDaemon::runPacmanIngestion()
         parsePacmanLog("/var/log/pacman.log", m_pacmanCursor);
 
     for (auto event : result.events) {
+        event.provenance.sourceType = "pacman.log";
+        event.provenance.sourceRef = "/var/log/pacman.log";
+        event.provenance.parserVersion = PACMAN_PARSER_VERSION;
+        event.provenance.ingestionId = m_currentIngestionId;
+
         RiskClassifier::classify(event);
         m_store->addEvent(event);
+        try {
+            m_store->addRiskAuditIfNeeded(event);
+        } catch (const std::exception &) {
+        }
     }
 
     if (!result.newCursor.empty()) {
@@ -172,8 +185,17 @@ void KhronicleDaemon::runJournalIngestion()
     const JournalParseResult result = parseJournalSince(m_journalLastTimestamp);
 
     for (auto event : result.events) {
+        event.provenance.sourceType = "journalctl";
+        event.provenance.sourceRef = "journalctl --output=short-iso";
+        event.provenance.parserVersion = JOURNAL_PARSER_VERSION;
+        event.provenance.ingestionId = m_currentIngestionId;
+
         RiskClassifier::classify(event);
         m_store->addEvent(event);
+        try {
+            m_store->addRiskAuditIfNeeded(event);
+        } catch (const std::exception &) {
+        }
     }
 
     if (result.lastTimestamp > m_journalLastTimestamp) {
@@ -202,6 +224,8 @@ void KhronicleDaemon::runJournalIngestion()
 void KhronicleDaemon::runSnapshotCheck()
 {
     SystemSnapshot current = buildCurrentSnapshot();
+    current.snapshotId = current.id;
+    current.ingestionId = m_currentIngestionId;
 
     if (!m_lastSnapshot.has_value()) {
         m_store->addSnapshot(current);
@@ -238,9 +262,17 @@ void KhronicleDaemon::runSnapshotCheck()
     event.relatedPackages = {detectKernelPackage(current)};
     event.riskLevel = "info";
     event.riskReason.clear();
+    event.provenance.sourceType = "snapshot";
+    event.provenance.sourceRef = current.id;
+    event.provenance.parserVersion = SNAPSHOT_BUILDER_VERSION;
+    event.provenance.ingestionId = m_currentIngestionId;
 
     RiskClassifier::classify(event);
     m_store->addEvent(event);
+    try {
+        m_store->addRiskAuditIfNeeded(event);
+    } catch (const std::exception &) {
+    }
     m_lastSnapshot = current;
 }
 

@@ -57,6 +57,7 @@ SystemSnapshot buildCurrentSnapshot()
                              snapshot.timestamp.time_since_epoch())
                              .count();
     snapshot.id = "snapshot-" + std::to_string(epochMs);
+    snapshot.snapshotId = snapshot.id;
 
     snapshot.gpuDriver = nlohmann::json::object();
     snapshot.firmwareVersions = nlohmann::json::object();
@@ -71,6 +72,7 @@ SystemSnapshot buildCurrentSnapshot()
         // Fallback when uname fails; keep kernelVersion empty.
         snapshot.kernelVersion.clear();
     }
+    snapshot.kernelSource = "uname -r";
 
     const std::vector<QString> packages = {
         QStringLiteral("linux"),

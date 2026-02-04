@@ -4,6 +4,8 @@
 
 namespace khronicle {
 
+constexpr const char *SNAPSHOT_BUILDER_VERSION = "snapshot_builder@1";
+
 /**
  * Build a snapshot of the current system state relevant to Khronicle:
  * - kernel version (uname -r)

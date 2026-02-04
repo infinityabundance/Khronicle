@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <random>
+#include <sstream>
 #include <set>
 #include <stdexcept>
 
@@ -26,7 +28,8 @@ constexpr const char *kCreateEventsTable =
     "    after_state TEXT,"
     "    related_packages TEXT,"
     "    risk_level TEXT DEFAULT 'info',"
-    "    risk_reason TEXT"
+    "    risk_reason TEXT,"
+    "    provenance TEXT"
     ");";
 
 constexpr const char *kCreateSnapshotsTable =
@@ -36,13 +39,26 @@ constexpr const char *kCreateSnapshotsTable =
     "    kernel_version TEXT NOT NULL,"
     "    gpu_driver TEXT,"
     "    firmware_versions TEXT,"
-    "    key_packages TEXT"
+    "    key_packages TEXT,"
+    "    snapshot_id TEXT,"
+    "    ingestion_id TEXT,"
+    "    kernel_source TEXT"
     ");";
 
 constexpr const char *kCreateMetaTable =
     "CREATE TABLE IF NOT EXISTS meta ("
     "    key TEXT PRIMARY KEY,"
     "    value TEXT NOT NULL"
+    ");";
+
+constexpr const char *kCreateAuditLogTable =
+    "CREATE TABLE IF NOT EXISTS audit_log ("
+    "    id TEXT PRIMARY KEY,"
+    "    timestamp INTEGER NOT NULL,"
+    "    audit_type TEXT NOT NULL,"
+    "    input_refs TEXT NOT NULL,"
+    "    method TEXT NOT NULL,"
+    "    output_summary TEXT"
     ");";
 
 class Statement {
@@ -145,6 +161,29 @@ std::string columnText(sqlite3_stmt *stmt, int index)
     return reinterpret_cast<const char *>(text);
 }
 
+std::string generateUuid()
+{
+    std::random_device rd;
+    std::mt19937_64 gen(rd());
+    std::uniform_int_distribution<uint64_t> dist;
+
+    const uint64_t part1 = dist(gen);
+    const uint64_t part2 = dist(gen);
+
+    std::ostringstream out;
+    out << std::hex;
+    out << (part1 >> 32);
+    out << "-";
+    out << ((part1 >> 16) & 0xFFFF);
+    out << "-";
+    out << (part1 & 0xFFFF);
+    out << "-";
+    out << (part2 >> 48);
+    out << "-";
+    out << (part2 & 0xFFFFFFFFFFFFULL);
+    return out.str();
+}
+
 nlohmann::json columnJson(sqlite3_stmt *stmt, int index)
 {
     const unsigned char *text = sqlite3_column_text(stmt, index);
@@ -199,6 +238,10 @@ EventSource sourceFromInt(int value)
 struct KhronicleStore::Impl {
     sqlite3 *db = nullptr;
     bool hasRiskColumns = false;
+    bool hasProvenanceColumn = false;
+    bool hasSnapshotIdColumn = false;
+    bool hasSnapshotIngestionColumn = false;
+    bool hasKernelSourceColumn = false;
 };
 
 KhronicleStore::KhronicleStore()
@@ -217,6 +260,7 @@ KhronicleStore::KhronicleStore()
     execOrThrow(impl->db, kCreateEventsTable);
     execOrThrow(impl->db, kCreateSnapshotsTable);
     execOrThrow(impl->db, kCreateMetaTable);
+    execOrThrow(impl->db, kCreateAuditLogTable);
 
     impl->hasRiskColumns = columnExists(impl->db, "events", "risk_level");
     if (!impl->hasRiskColumns) {
@@ -225,6 +269,8 @@ KhronicleStore::KhronicleStore()
                         "ALTER TABLE events ADD COLUMN risk_level TEXT DEFAULT 'info';");
             execOrThrow(impl->db,
                         "ALTER TABLE events ADD COLUMN risk_reason TEXT;");
+            execOrThrow(impl->db,
+                        "ALTER TABLE events ADD COLUMN provenance TEXT;");
             impl->hasRiskColumns = true;
         } catch (const std::exception &) {
             impl->hasRiskColumns = false;
@@ -246,6 +292,50 @@ KhronicleStore::KhronicleStore()
 
     if (!impl->hasRiskColumns) {
         std::cerr << "Khronicle: risk columns unavailable; defaulting risk metadata.\n";
+    }
+
+    impl->hasProvenanceColumn = columnExists(impl->db, "events", "provenance");
+    if (!impl->hasProvenanceColumn) {
+        try {
+            execOrThrow(impl->db,
+                        "ALTER TABLE events ADD COLUMN provenance TEXT;");
+            impl->hasProvenanceColumn = true;
+        } catch (const std::exception &) {
+            impl->hasProvenanceColumn = false;
+        }
+    }
+
+    impl->hasSnapshotIdColumn = columnExists(impl->db, "snapshots", "snapshot_id");
+    if (!impl->hasSnapshotIdColumn) {
+        try {
+            execOrThrow(impl->db,
+                        "ALTER TABLE snapshots ADD COLUMN snapshot_id TEXT;");
+            impl->hasSnapshotIdColumn = true;
+        } catch (const std::exception &) {
+            impl->hasSnapshotIdColumn = false;
+        }
+    }
+
+    impl->hasSnapshotIngestionColumn = columnExists(impl->db, "snapshots", "ingestion_id");
+    if (!impl->hasSnapshotIngestionColumn) {
+        try {
+            execOrThrow(impl->db,
+                        "ALTER TABLE snapshots ADD COLUMN ingestion_id TEXT;");
+            impl->hasSnapshotIngestionColumn = true;
+        } catch (const std::exception &) {
+            impl->hasSnapshotIngestionColumn = false;
+        }
+    }
+
+    impl->hasKernelSourceColumn = columnExists(impl->db, "snapshots", "kernel_source");
+    if (!impl->hasKernelSourceColumn) {
+        try {
+            execOrThrow(impl->db,
+                        "ALTER TABLE snapshots ADD COLUMN kernel_source TEXT;");
+            impl->hasKernelSourceColumn = true;
+        } catch (const std::exception &) {
+            impl->hasKernelSourceColumn = false;
+        }
     }
 }
 
@@ -280,9 +370,15 @@ void KhronicleStore::addEvent(const KhronicleEvent &event)
     if (impl->hasRiskColumns) {
         sql += ", risk_level, risk_reason";
     }
+    if (impl->hasProvenanceColumn) {
+        sql += ", provenance";
+    }
     sql += ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?";
     if (impl->hasRiskColumns) {
         sql += ", ?, ?";
+    }
+    if (impl->hasProvenanceColumn) {
+        sql += ", ?";
     }
     sql += ");";
 
@@ -296,9 +392,19 @@ void KhronicleStore::addEvent(const KhronicleEvent &event)
     bindJson(stmt.get(), 7, event.beforeState);
     bindJson(stmt.get(), 8, event.afterState);
     bindJson(stmt.get(), 9, nlohmann::json(event.relatedPackages));
+    int bindIndex = 10;
     if (impl->hasRiskColumns) {
-        bindText(stmt.get(), 10, event.riskLevel.empty() ? "info" : event.riskLevel);
-        bindOptionalText(stmt.get(), 11, event.riskReason);
+        bindText(stmt.get(), bindIndex++, event.riskLevel.empty() ? "info" : event.riskLevel);
+        bindOptionalText(stmt.get(), bindIndex++, event.riskReason);
+    }
+    if (impl->hasProvenanceColumn) {
+        nlohmann::json prov{
+            {"sourceType", event.provenance.sourceType},
+            {"sourceRef", event.provenance.sourceRef},
+            {"parserVersion", event.provenance.parserVersion},
+            {"ingestionId", event.provenance.ingestionId}
+        };
+        bindOptionalText(stmt.get(), bindIndex++, prov.dump());
     }
 
     if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
@@ -308,16 +414,48 @@ void KhronicleStore::addEvent(const KhronicleEvent &event)
 
 void KhronicleStore::addSnapshot(const SystemSnapshot &snapshot)
 {
-    Statement stmt(impl->db,
-                   "INSERT OR REPLACE INTO snapshots (id, timestamp, "
-                   "kernel_version, gpu_driver, firmware_versions, "
-                   "key_packages) VALUES (?, ?, ?, ?, ?, ?);");
+    std::string sql =
+        "INSERT OR REPLACE INTO snapshots (id, timestamp, "
+        "kernel_version, gpu_driver, firmware_versions, "
+        "key_packages";
+    if (impl->hasSnapshotIdColumn) {
+        sql += ", snapshot_id";
+    }
+    if (impl->hasSnapshotIngestionColumn) {
+        sql += ", ingestion_id";
+    }
+    if (impl->hasKernelSourceColumn) {
+        sql += ", kernel_source";
+    }
+    sql += ") VALUES (?, ?, ?, ?, ?, ?";
+    if (impl->hasSnapshotIdColumn) {
+        sql += ", ?";
+    }
+    if (impl->hasSnapshotIngestionColumn) {
+        sql += ", ?";
+    }
+    if (impl->hasKernelSourceColumn) {
+        sql += ", ?";
+    }
+    sql += ");";
+
+    Statement stmt(impl->db, sql.c_str());
     bindText(stmt.get(), 1, snapshot.id);
     sqlite3_bind_int64(stmt.get(), 2, toEpochSeconds(snapshot.timestamp));
     bindText(stmt.get(), 3, snapshot.kernelVersion);
     bindJson(stmt.get(), 4, snapshot.gpuDriver);
     bindJson(stmt.get(), 5, snapshot.firmwareVersions);
     bindJson(stmt.get(), 6, snapshot.keyPackages);
+    int bindIndex = 7;
+    if (impl->hasSnapshotIdColumn) {
+        bindOptionalText(stmt.get(), bindIndex++, snapshot.snapshotId);
+    }
+    if (impl->hasSnapshotIngestionColumn) {
+        bindOptionalText(stmt.get(), bindIndex++, snapshot.ingestionId);
+    }
+    if (impl->hasKernelSourceColumn) {
+        bindOptionalText(stmt.get(), bindIndex++, snapshot.kernelSource);
+    }
 
     if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
         throw std::runtime_error("failed to insert snapshot");
@@ -332,6 +470,9 @@ std::vector<KhronicleEvent> KhronicleStore::getEventsSince(
         "before_state, after_state, related_packages";
     if (impl->hasRiskColumns) {
         sql += ", risk_level, risk_reason";
+    }
+    if (impl->hasProvenanceColumn) {
+        sql += ", provenance";
     }
     sql += " FROM events WHERE timestamp >= ? ORDER BY timestamp ASC;";
     Statement stmt(impl->db, sql.c_str());
@@ -352,15 +493,37 @@ std::vector<KhronicleEvent> KhronicleStore::getEventsSince(
         if (related.is_array()) {
             event.relatedPackages = related.get<std::vector<std::string>>();
         }
+        int colIndex = 9;
         if (impl->hasRiskColumns) {
-            event.riskLevel = columnText(stmt.get(), 9);
-            event.riskReason = columnText(stmt.get(), 10);
+            event.riskLevel = columnText(stmt.get(), colIndex++);
+            event.riskReason = columnText(stmt.get(), colIndex++);
             if (event.riskLevel.empty()) {
                 event.riskLevel = "info";
             }
         } else {
             event.riskLevel = "info";
             event.riskReason.clear();
+        }
+        if (impl->hasProvenanceColumn) {
+            const std::string provText = columnText(stmt.get(), colIndex++);
+            if (!provText.empty()) {
+                try {
+                    const auto provJson = nlohmann::json::parse(provText);
+                    event.provenance.sourceType = provJson.value("sourceType", "unknown");
+                    event.provenance.sourceRef = provJson.value("sourceRef", "");
+                    event.provenance.parserVersion = provJson.value("parserVersion", "legacy");
+                    event.provenance.ingestionId = provJson.value("ingestionId", "");
+                } catch (const nlohmann::json::parse_error &) {
+                    event.provenance.sourceType = "unknown";
+                    event.provenance.parserVersion = "legacy";
+                }
+            } else {
+                event.provenance.sourceType = "unknown";
+                event.provenance.parserVersion = "legacy";
+            }
+        } else {
+            event.provenance.sourceType = "unknown";
+            event.provenance.parserVersion = "legacy";
         }
         events.push_back(std::move(event));
     }
@@ -377,6 +540,9 @@ std::vector<KhronicleEvent> KhronicleStore::getEventsBetween(
         "before_state, after_state, related_packages";
     if (impl->hasRiskColumns) {
         sql += ", risk_level, risk_reason";
+    }
+    if (impl->hasProvenanceColumn) {
+        sql += ", provenance";
     }
     sql += " FROM events WHERE timestamp >= ? AND timestamp <= ? "
            "ORDER BY timestamp ASC;";
@@ -399,15 +565,37 @@ std::vector<KhronicleEvent> KhronicleStore::getEventsBetween(
         if (related.is_array()) {
             event.relatedPackages = related.get<std::vector<std::string>>();
         }
+        int colIndex = 9;
         if (impl->hasRiskColumns) {
-            event.riskLevel = columnText(stmt.get(), 9);
-            event.riskReason = columnText(stmt.get(), 10);
+            event.riskLevel = columnText(stmt.get(), colIndex++);
+            event.riskReason = columnText(stmt.get(), colIndex++);
             if (event.riskLevel.empty()) {
                 event.riskLevel = "info";
             }
         } else {
             event.riskLevel = "info";
             event.riskReason.clear();
+        }
+        if (impl->hasProvenanceColumn) {
+            const std::string provText = columnText(stmt.get(), colIndex++);
+            if (!provText.empty()) {
+                try {
+                    const auto provJson = nlohmann::json::parse(provText);
+                    event.provenance.sourceType = provJson.value("sourceType", "unknown");
+                    event.provenance.sourceRef = provJson.value("sourceRef", "");
+                    event.provenance.parserVersion = provJson.value("parserVersion", "legacy");
+                    event.provenance.ingestionId = provJson.value("ingestionId", "");
+                } catch (const nlohmann::json::parse_error &) {
+                    event.provenance.sourceType = "unknown";
+                    event.provenance.parserVersion = "legacy";
+                }
+            } else {
+                event.provenance.sourceType = "unknown";
+                event.provenance.parserVersion = "legacy";
+            }
+        } else {
+            event.provenance.sourceType = "unknown";
+            event.provenance.parserVersion = "legacy";
         }
         events.push_back(std::move(event));
     }
@@ -417,10 +605,20 @@ std::vector<KhronicleEvent> KhronicleStore::getEventsBetween(
 
 std::vector<SystemSnapshot> KhronicleStore::listSnapshots() const
 {
-    Statement stmt(impl->db,
-                   "SELECT id, timestamp, kernel_version, gpu_driver, "
-                   "firmware_versions, key_packages "
-                   "FROM snapshots ORDER BY timestamp ASC;");
+    std::string sql =
+        "SELECT id, timestamp, kernel_version, gpu_driver, "
+        "firmware_versions, key_packages";
+    if (impl->hasSnapshotIdColumn) {
+        sql += ", snapshot_id";
+    }
+    if (impl->hasSnapshotIngestionColumn) {
+        sql += ", ingestion_id";
+    }
+    if (impl->hasKernelSourceColumn) {
+        sql += ", kernel_source";
+    }
+    sql += " FROM snapshots ORDER BY timestamp ASC;";
+    Statement stmt(impl->db, sql.c_str());
 
     std::vector<SystemSnapshot> snapshots;
     while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
@@ -431,6 +629,22 @@ std::vector<SystemSnapshot> KhronicleStore::listSnapshots() const
         snapshot.gpuDriver = columnJson(stmt.get(), 3);
         snapshot.firmwareVersions = columnJson(stmt.get(), 4);
         snapshot.keyPackages = columnJson(stmt.get(), 5);
+        int colIndex = 6;
+        if (impl->hasSnapshotIdColumn) {
+            snapshot.snapshotId = columnText(stmt.get(), colIndex++);
+        } else {
+            snapshot.snapshotId = snapshot.id;
+        }
+        if (impl->hasSnapshotIngestionColumn) {
+            snapshot.ingestionId = columnText(stmt.get(), colIndex++);
+        } else {
+            snapshot.ingestionId.clear();
+        }
+        if (impl->hasKernelSourceColumn) {
+            snapshot.kernelSource = columnText(stmt.get(), colIndex++);
+        } else {
+            snapshot.kernelSource.clear();
+        }
         snapshots.push_back(std::move(snapshot));
     }
 
@@ -440,10 +654,20 @@ std::vector<SystemSnapshot> KhronicleStore::listSnapshots() const
 std::optional<SystemSnapshot> KhronicleStore::getSnapshot(
     const std::string &id) const
 {
-    Statement stmt(impl->db,
-                   "SELECT id, timestamp, kernel_version, gpu_driver, "
-                   "firmware_versions, key_packages "
-                   "FROM snapshots WHERE id = ? LIMIT 1;");
+    std::string sql =
+        "SELECT id, timestamp, kernel_version, gpu_driver, "
+        "firmware_versions, key_packages";
+    if (impl->hasSnapshotIdColumn) {
+        sql += ", snapshot_id";
+    }
+    if (impl->hasSnapshotIngestionColumn) {
+        sql += ", ingestion_id";
+    }
+    if (impl->hasKernelSourceColumn) {
+        sql += ", kernel_source";
+    }
+    sql += " FROM snapshots WHERE id = ? LIMIT 1;";
+    Statement stmt(impl->db, sql.c_str());
     bindText(stmt.get(), 1, id);
 
     if (sqlite3_step(stmt.get()) != SQLITE_ROW) {
@@ -457,12 +681,28 @@ std::optional<SystemSnapshot> KhronicleStore::getSnapshot(
     snapshot.gpuDriver = columnJson(stmt.get(), 3);
     snapshot.firmwareVersions = columnJson(stmt.get(), 4);
     snapshot.keyPackages = columnJson(stmt.get(), 5);
+    int colIndex = 6;
+    if (impl->hasSnapshotIdColumn) {
+        snapshot.snapshotId = columnText(stmt.get(), colIndex++);
+    } else {
+        snapshot.snapshotId = snapshot.id;
+    }
+    if (impl->hasSnapshotIngestionColumn) {
+        snapshot.ingestionId = columnText(stmt.get(), colIndex++);
+    } else {
+        snapshot.ingestionId.clear();
+    }
+    if (impl->hasKernelSourceColumn) {
+        snapshot.kernelSource = columnText(stmt.get(), colIndex++);
+    } else {
+        snapshot.kernelSource.clear();
+    }
 
     return snapshot;
 }
 
 KhronicleDiff KhronicleStore::diffSnapshots(const std::string &aId,
-                                            const std::string &bId) const
+                                            const std::string &bId)
 {
     KhronicleDiff diff;
     diff.snapshotAId = aId;
@@ -529,6 +769,18 @@ KhronicleDiff KhronicleStore::diffSnapshots(const std::string &aId,
         }
     }
 
+    AuditLogEntry audit;
+    audit.id = generateUuid();
+    audit.timestamp = std::chrono::system_clock::now();
+    audit.auditType = "snapshot_diff";
+    audit.inputRefs = {aId, bId};
+    audit.method = "SnapshotDiffer@1";
+    audit.outputSummary = "Changed fields: " + std::to_string(diff.changedFields.size());
+    try {
+        addAuditLog(audit);
+    } catch (const std::exception &) {
+    }
+
     return diff;
 }
 
@@ -573,6 +825,133 @@ bool KhronicleStore::integrityCheck(std::string *message) const
         *message = result;
     }
     return result == "ok";
+}
+
+std::optional<nlohmann::json> KhronicleStore::getEventProvenance(
+    const std::string &id) const
+{
+    if (!impl->hasProvenanceColumn) {
+        return nlohmann::json{
+            {"sourceType", "unknown"},
+            {"sourceRef", ""},
+            {"parserVersion", "legacy"},
+            {"ingestionId", ""}
+        };
+    }
+
+    Statement stmt(impl->db,
+                   "SELECT provenance FROM events WHERE id = ? LIMIT 1;");
+    bindText(stmt.get(), 1, id);
+
+    if (sqlite3_step(stmt.get()) != SQLITE_ROW) {
+        return std::nullopt;
+    }
+
+    const std::string provText = columnText(stmt.get(), 0);
+    if (provText.empty()) {
+        return nlohmann::json::object();
+    }
+
+    try {
+        return nlohmann::json::parse(provText);
+    } catch (const nlohmann::json::parse_error &) {
+        return nlohmann::json::object();
+    }
+}
+
+void KhronicleStore::addAuditLog(const AuditLogEntry &entry)
+{
+    Statement stmt(impl->db,
+                   "INSERT OR REPLACE INTO audit_log (id, timestamp, audit_type, "
+                   "input_refs, method, output_summary) VALUES (?, ?, ?, ?, ?, ?);");
+    bindText(stmt.get(), 1, entry.id);
+    sqlite3_bind_int64(stmt.get(), 2, toEpochSeconds(entry.timestamp));
+    bindText(stmt.get(), 3, entry.auditType);
+    bindText(stmt.get(), 4, nlohmann::json(entry.inputRefs).dump());
+    bindText(stmt.get(), 5, entry.method);
+    bindOptionalText(stmt.get(), 6, entry.outputSummary);
+
+    if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
+        throw std::runtime_error("failed to insert audit log");
+    }
+}
+
+void KhronicleStore::addRiskAuditIfNeeded(const KhronicleEvent &event)
+{
+    if (event.riskLevel != "important" && event.riskLevel != "critical") {
+        return;
+    }
+
+    AuditLogEntry entry;
+    entry.id = generateUuid();
+    entry.timestamp = std::chrono::system_clock::now();
+    entry.auditType = "risk_classification";
+    entry.inputRefs = {event.id};
+    entry.method = "RiskClassifier@1";
+    entry.outputSummary = event.riskReason.empty()
+        ? event.summary
+        : event.riskReason;
+
+    addAuditLog(entry);
+}
+
+std::vector<AuditLogEntry> KhronicleStore::getAuditLogSince(
+    std::chrono::system_clock::time_point since,
+    const std::optional<std::string> &type) const
+{
+    std::string sql =
+        "SELECT id, timestamp, audit_type, input_refs, method, output_summary "
+        "FROM audit_log WHERE timestamp >= ?";
+    if (type.has_value()) {
+        sql += " AND audit_type = ?";
+    }
+    sql += " ORDER BY timestamp ASC;";
+
+    Statement stmt(impl->db, sql.c_str());
+    sqlite3_bind_int64(stmt.get(), 1, toEpochSeconds(since));
+    if (type.has_value()) {
+        bindText(stmt.get(), 2, *type);
+    }
+
+    std::vector<AuditLogEntry> entries;
+    while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
+        AuditLogEntry entry;
+        entry.id = columnText(stmt.get(), 0);
+        entry.timestamp = fromEpochSeconds(sqlite3_column_int64(stmt.get(), 1));
+        entry.auditType = columnText(stmt.get(), 2);
+        const std::string refsText = columnText(stmt.get(), 3);
+        if (!refsText.empty()) {
+            try {
+                auto refsJson = nlohmann::json::parse(refsText);
+                if (refsJson.is_array()) {
+                    entry.inputRefs = refsJson.get<std::vector<std::string>>();
+                }
+            } catch (const nlohmann::json::parse_error &) {
+                entry.inputRefs.clear();
+            }
+        }
+        entry.method = columnText(stmt.get(), 4);
+        entry.outputSummary = columnText(stmt.get(), 5);
+        entries.push_back(std::move(entry));
+    }
+
+    return entries;
+}
+
+std::string KhronicleStore::schemaSql() const
+{
+    Statement stmt(impl->db,
+                   "SELECT sql FROM sqlite_master WHERE sql IS NOT NULL "
+                   "AND type IN ('table','index','trigger') ORDER BY name;");
+    std::string schema;
+    while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
+        const std::string sql = columnText(stmt.get(), 0);
+        if (!sql.empty()) {
+            schema += sql;
+            schema += "\n";
+        }
+    }
+    return schema;
 }
 
 } // namespace khronicle

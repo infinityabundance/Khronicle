@@ -1,6 +1,7 @@
 #include "daemon/khronicle_api_server.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <optional>
 #include <vector>
 
@@ -326,6 +327,53 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
 
             result["ingestionIntervalSeconds"] = 300;
 
+            const QByteArray response = makeResultResponse(result, id);
+            socket->write(response);
+        } else if (method == "get_event_provenance") {
+            const std::string eventId = params.value("eventId", "");
+            if (eventId.empty()) {
+                const QByteArray response = makeErrorResponse("Missing eventId", id);
+                socket->write(response);
+                socket->flush();
+                socket->disconnectFromServer();
+                return;
+            }
+            const auto provenance = m_store.getEventProvenance(eventId);
+            if (!provenance.has_value()) {
+                const QByteArray response = makeErrorResponse("Provenance not found", id);
+                socket->write(response);
+                socket->flush();
+                socket->disconnectFromServer();
+                return;
+            }
+            nlohmann::json result;
+            result["provenance"] = *provenance;
+            const QByteArray response = makeResultResponse(result, id);
+            socket->write(response);
+        } else if (method == "get_audit_log") {
+            const std::string sinceValue = params.value("since", "");
+            std::chrono::system_clock::time_point since{};
+            if (sinceValue.empty()) {
+                since = std::chrono::system_clock::now() - std::chrono::hours(24);
+            } else {
+                since = fromIso8601Utc(sinceValue);
+                if (since == std::chrono::system_clock::time_point{}) {
+                    const QByteArray response = makeErrorResponse("Invalid since timestamp", id);
+                    socket->write(response);
+                    socket->flush();
+                    socket->disconnectFromServer();
+                    return;
+                }
+            }
+
+            std::optional<std::string> type;
+            if (params.contains("type") && params["type"].is_string()) {
+                type = params["type"].get<std::string>();
+            }
+
+            const auto entries = m_store.getAuditLogSince(since, type);
+            nlohmann::json result;
+            result["entries"] = entries;
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
         } else {
