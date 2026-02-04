@@ -1,5 +1,8 @@
 # Governance
 
+This document describes intended stewardship and decision-making; it does not
+promise behavior, correctness, or long-term adherence.
+
 ## Project Scope & Intent
 
 Khronicle is a system chronicle. It records, explains, and surfaces signals
@@ -59,4 +62,3 @@ Maintainers are responsible for protecting:
 
 The role is to preserve trust and continuity over time, not to maximize
 short-term velocity.
-

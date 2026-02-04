@@ -1,5 +1,8 @@
 # Evolution
 
+This document describes intended growth and design direction; it does not
+promise behavior, correctness, or long-term adherence.
+
 This document explains how Khronicle should grow without losing its integrity.
 It is about design direction, not a roadmap.
 
@@ -33,5 +36,4 @@ These are guardrails, not preferences:
 - No opaque scoring or black-box inference
 - No hidden policy enforcement
 
-See `STABILITY.md` for compatibility guarantees.
-
+See `STABILITY.md` for compatibility expectations.

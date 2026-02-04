@@ -1,5 +1,13 @@
 # Invariants
 
+This document describes intended invariants and meaning-preservation anchors;
+it does not promise behavior, correctness, or long-term adherence.
+
+The invariants described here are conceptual anchors, not enforced promises.
+They exist to preserve meaning and intent over time, but may be violated by
+bugs, incomplete implementations, or future changes. Their purpose is to make
+such violations visible and discussable, not impossible.
+
 This document defines what Khronicle is. These invariants are stronger than
 preferences or style guides. Violating them means the system is no longer
 Khronicle.
@@ -36,4 +44,3 @@ No embedded scripting engines or opaque evaluation logic.
 
 Time is central: ordering and temporal context matter. Khronicle does not
 collapse history into scores or aggregates without preserving chronology.
-
