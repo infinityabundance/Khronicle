@@ -79,7 +79,7 @@ int ReplayHarness::runScenario(const QString &scenarioDir)
               QStringLiteral("replay"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"scenarioDir", scenarioDir.toStdString()}});
+              (nlohmann::json{{"scenarioDir", scenarioDir.toStdString()}}));
 
     return runSteps(scenario["steps"]);
 }
@@ -124,13 +124,20 @@ int ReplayHarness::runApiStep(const nlohmann::json &step)
 
     KhronicleStore store;
     KhronicleApiServer server(store);
-    if (!server.start()) {
+
+    // Use direct method invocation for reliability in test/replay scenarios
+    // (socket communication in same thread requires event loop coordination)
+    nlohmann::json root;
+    root["id"] = 1;
+    root["method"] = method;
+    root["params"] = params;
+    const QByteArray response = server.handleRequestPayload(
+        QByteArray::fromStdString(root.dump()));
+    const auto parsed = nlohmann::json::parse(response.toStdString(), nullptr, false);
+    if (parsed.is_discarded() || parsed.contains("error")) {
         return 1;
     }
-
-    const QString socketPath = qEnvironmentVariable("XDG_RUNTIME_DIR")
-        + QStringLiteral("/khronicle.sock");
-    return sendApiRequest(socketPath, QString::fromStdString(method), params);
+    return 0;
 }
 
 int ReplayHarness::runReportStep(const nlohmann::json &step)

@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
               QStringLiteral("cli"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"args", filteredArgs.size()}});
+              (nlohmann::json{{"args", filteredArgs.size()}}));
 
     if (qEnvironmentVariableIntValue("KHRONICLE_SCENARIO_CAPTURE") == 1) {
         const QString scenarioId = qEnvironmentVariable("KHRONICLE_SCENARIO_ID");

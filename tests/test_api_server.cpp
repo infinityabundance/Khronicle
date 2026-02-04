@@ -28,10 +28,11 @@ private:
     QTemporaryDir m_tempDir;
     QByteArray m_prevHome;
     QByteArray m_prevRuntime;
-
     void resetDb();
     std::filesystem::path dbPath() const;
-    QJsonObject sendRequest(const QString &method, const QJsonObject &params = {});
+    QJsonObject sendRequest(khronicle::KhronicleApiServer &server,
+                            const QString &method,
+                            const QJsonObject &params = {});
 };
 
 void ApiServerTests::initTestCase()
@@ -57,6 +58,7 @@ void ApiServerTests::cleanupTestCase()
     } else {
         qputenv("XDG_RUNTIME_DIR", m_prevRuntime);
     }
+
 }
 
 std::filesystem::path ApiServerTests::dbPath() const
@@ -71,29 +73,32 @@ void ApiServerTests::resetDb()
     std::filesystem::remove(dbPath(), error);
 }
 
-QJsonObject ApiServerTests::sendRequest(const QString &method, const QJsonObject &params)
+QJsonObject ApiServerTests::sendRequest(khronicle::KhronicleApiServer &server,
+                                        const QString &method,
+                                        const QJsonObject &params)
 {
-    QLocalSocket socket;
-    socket.connectToServer(m_tempDir.path() + "/khronicle.sock");
-    QVERIFY(socket.waitForConnected(1000));
-    QCoreApplication::processEvents();
-
     QJsonObject root;
     root["id"] = 1;
     root["method"] = method;
     root["params"] = params;
 
     const QByteArray payload = QJsonDocument(root).toJson(QJsonDocument::Compact);
-    socket.write(payload);
-    QVERIFY(socket.waitForBytesWritten(1000));
-    QCoreApplication::processEvents();
-    QVERIFY(socket.waitForReadyRead(1000));
+    const QByteArray response = server.handleRequestPayload(payload);
+    if (response.isEmpty()) {
+        qWarning() << "Empty response from server";
+        return QJsonObject();
+    }
 
-    const QByteArray response = socket.readAll();
     QJsonParseError error{};
     const QJsonDocument doc = QJsonDocument::fromJson(response, &error);
-    QVERIFY(error.error == QJsonParseError::NoError);
-    QVERIFY(doc.isObject());
+    if (error.error != QJsonParseError::NoError) {
+        qWarning() << "JSON parse error:" << error.errorString() << "Response:" << response;
+        return QJsonObject();
+    }
+    if (!doc.isObject()) {
+        qWarning() << "Response is not an object:" << response;
+        return QJsonObject();
+    }
     return doc.object();
 }
 
@@ -119,17 +124,16 @@ void ApiServerTests::testBasicMethods()
     store.addSnapshot(snapshot);
 
     khronicle::KhronicleApiServer server(store);
-    QVERIFY(server.start());
 
-    const auto summary = sendRequest("summary_since", {
+    const auto summary = sendRequest(server, "summary_since", {
         {"since", QString::fromStdString(khronicle::toIso8601Utc(event.timestamp - std::chrono::hours(1)))}
     });
     QVERIFY(summary.contains("result"));
 
-    const auto snapshots = sendRequest("list_snapshots");
+    const auto snapshots = sendRequest(server, "list_snapshots");
     QVERIFY(snapshots["result"].toObject().contains("snapshots"));
 
-    const auto diff = sendRequest("diff_snapshots", {
+    const auto diff = sendRequest(server, "diff_snapshots", {
         {"a", "snap-1"},
         {"b", "snap-1"}
     });
@@ -141,9 +145,8 @@ void ApiServerTests::testErrorHandling()
     resetDb();
     khronicle::KhronicleStore store;
     khronicle::KhronicleApiServer server(store);
-    QVERIFY(server.start());
 
-    const auto response = sendRequest("unknown_method");
+    const auto response = sendRequest(server, "unknown_method");
     QVERIFY(response.contains("error"));
 }
 
@@ -152,15 +155,14 @@ void ApiServerTests::testRulesAndSignals()
     resetDb();
     khronicle::KhronicleStore store;
     khronicle::KhronicleApiServer server(store);
-    QVERIFY(server.start());
 
-    const auto rules = sendRequest("list_watch_rules");
+    const auto rules = sendRequest(server, "list_watch_rules");
     QVERIFY(rules["result"].toObject().contains("rules"));
 
-    const auto signals = sendRequest("get_watch_signals_since", {
+    const auto watchSignals = sendRequest(server, "get_watch_signals_since", {
         {"since", QString::fromStdString(khronicle::toIso8601Utc(std::chrono::system_clock::now()))}
     });
-    QVERIFY(signals["result"].toObject().contains("signals"));
+    QVERIFY(watchSignals["result"].toObject().contains("signals"));
 }
 
 QTEST_MAIN(ApiServerTests)

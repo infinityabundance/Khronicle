@@ -306,7 +306,7 @@ KhronicleStore::KhronicleStore()
               QStringLiteral("sqlite_open"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"path", dbPath.string()}});
+              (nlohmann::json{{"path", dbPath.string()}}));
     if (sqlite3_open(dbPath.string().c_str(), &impl->db) != SQLITE_OK) {
         KLOG_ERROR(QStringLiteral("KhronicleStore"),
                    QStringLiteral("KhronicleStore"),
@@ -315,7 +315,7 @@ KhronicleStore::KhronicleStore()
                    QStringLiteral("sqlite_open"),
                    khronicle::logging::defaultWho(),
                    QString(),
-                   nlohmann::json{{"path", dbPath.string()}});
+                   (nlohmann::json{{"path", dbPath.string()}}));
         throw std::runtime_error("failed to open khronicle database");
     }
 
@@ -395,9 +395,9 @@ void KhronicleStore::addEvent(const KhronicleEvent &event)
                QStringLiteral("sqlite_insert"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"id", event.id},
+               (nlohmann::json{{"id", event.id},
                               {"category", toCategoryString(event.category)},
-                              {"timestamp", toIso8601Utc(event.timestamp)}});
+                              {"timestamp", toIso8601Utc(event.timestamp)}}));
     Statement stmt(impl->db,
                    "INSERT OR REPLACE INTO events (id, timestamp, category, "
                    "source, summary, details, before_state, after_state, "
@@ -428,9 +428,9 @@ void KhronicleStore::addSnapshot(const SystemSnapshot &snapshot)
                QStringLiteral("sqlite_insert"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"id", snapshot.id},
+               (nlohmann::json{{"id", snapshot.id},
                               {"kernelVersion", snapshot.kernelVersion},
-                              {"timestamp", toIso8601Utc(snapshot.timestamp)}});
+                              {"timestamp", toIso8601Utc(snapshot.timestamp)}}));
     Statement stmt(impl->db,
                    "INSERT OR REPLACE INTO snapshots (id, timestamp, "
                    "kernel_version, gpu_driver, firmware_versions, "
@@ -489,8 +489,8 @@ void KhronicleStore::upsertWatchRule(const WatchRule &rule)
                QStringLiteral("sqlite_upsert"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"id", rule.id},
-                              {"enabled", rule.enabled}});
+               (nlohmann::json{{"id", rule.id},
+                              {"enabled", rule.enabled}}));
     Statement stmt(impl->db,
                    "INSERT OR REPLACE INTO watch_rules ("
                    "id, name, description, scope, severity, enabled, "
@@ -524,7 +524,7 @@ void KhronicleStore::deleteWatchRule(const std::string &id)
               QStringLiteral("sqlite_delete"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"id", id}});
+              (nlohmann::json{{"id", id}}));
     Statement stmt(impl->db, "DELETE FROM watch_rules WHERE id = ?;");
     bindText(stmt.get(), 1, id);
 
@@ -542,9 +542,9 @@ void KhronicleStore::addWatchSignal(const WatchSignal &signal)
                QStringLiteral("sqlite_insert"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"id", signal.id},
+               (nlohmann::json{{"id", signal.id},
                               {"ruleId", signal.ruleId},
-                              {"originType", signal.originType}});
+                              {"originType", signal.originType}}));
     Statement stmt(impl->db,
                    "INSERT OR REPLACE INTO watch_signals ("
                    "id, timestamp, rule_id, rule_name, severity, "
@@ -574,7 +574,7 @@ std::vector<WatchSignal> KhronicleStore::getWatchSignalsSince(
                    "ORDER BY timestamp ASC;");
     sqlite3_bind_int64(stmt.get(), 1, toEpochSeconds(t));
 
-    std::vector<WatchSignal> signals;
+    std::vector<WatchSignal> result;
     while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
         WatchSignal signal;
         signal.id = columnText(stmt.get(), 0);
@@ -585,10 +585,10 @@ std::vector<WatchSignal> KhronicleStore::getWatchSignalsSince(
         signal.originType = columnText(stmt.get(), 5);
         signal.originId = columnText(stmt.get(), 6);
         signal.message = columnText(stmt.get(), 7);
-        signals.push_back(std::move(signal));
+        result.push_back(std::move(signal));
     }
 
-    return signals;
+    return result;
 }
 
 std::vector<KhronicleEvent> KhronicleStore::getEventsSince(
@@ -869,8 +869,8 @@ void KhronicleStore::setMeta(const std::string &key, const std::string &value)
                QStringLiteral("sqlite_upsert"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"key", key},
-                              {"value", value}});
+               (nlohmann::json{{"key", key},
+                              {"value", value}}));
     Statement stmt(impl->db,
                    "INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?);");
     bindText(stmt.get(), 1, key);

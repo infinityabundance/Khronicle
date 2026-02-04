@@ -62,7 +62,7 @@ void AggregateTests::testAggregate()
         outputArg.constData()
     };
 
-    const int result = cli.run(9, const_cast<char **>(argv));
+    const int result = cli.run(8, const_cast<char **>(argv));
     QCOMPARE(result, 0);
 
     QFile outFile(outputPath);

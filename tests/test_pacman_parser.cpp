@@ -17,10 +17,16 @@ private slots:
 
 static QString writeLogFile(QTemporaryDir &tempDir, const QString &content)
 {
-    QVERIFY(tempDir.isValid());
+    if (!tempDir.isValid()) {
+        qWarning() << "Temp dir not valid";
+        return QString();
+    }
     const QString path = tempDir.path() + "/pacman.log";
     QFile file(path);
-    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        qWarning() << "Failed to open file:" << path << file.errorString();
+        return QString();
+    }
     file.write(content.toUtf8());
     file.close();
     return path;

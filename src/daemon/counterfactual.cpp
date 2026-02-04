@@ -23,9 +23,9 @@ CounterfactualResult computeCounterfactual(
                QStringLiteral("snapshot_diff"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"baselineId", baseline.id},
+               (nlohmann::json{{"baselineId", baseline.id},
                               {"comparisonId", comparison.id},
-                              {"eventCount", interveningEvents.size()}});
+                              {"eventCount", interveningEvents.size()}}));
     CounterfactualResult result;
     result.baselineSnapshotId = baseline.id;
     result.comparisonSnapshotId = comparison.id;
@@ -98,7 +98,7 @@ CounterfactualResult computeCounterfactual(
               QStringLiteral("snapshot_diff"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"changedFields", diff.changedFields.size()}});
+              (nlohmann::json{{"changedFields", diff.changedFields.size()}}));
     return result;
 }
 

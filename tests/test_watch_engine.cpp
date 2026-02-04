@@ -87,11 +87,11 @@ void WatchEngineTests::testEventRuleMatch()
 
     engine.evaluateEvent(event);
 
-    const auto signals = store.getWatchSignalsSince(
+    const auto watchSignals = store.getWatchSignalsSince(
         std::chrono::system_clock::time_point{});
-    QCOMPARE(static_cast<int>(signals.size()), 1);
-    QCOMPARE(QString::fromStdString(signals[0].ruleId), QString("kernel-critical"));
-    QCOMPARE(QString::fromStdString(signals[0].originType), QString("event"));
+    QCOMPARE(static_cast<int>(watchSignals.size()), 1);
+    QCOMPARE(QString::fromStdString(watchSignals[0].ruleId), QString("kernel-critical"));
+    QCOMPARE(QString::fromStdString(watchSignals[0].originType), QString("event"));
 }
 
 void WatchEngineTests::testActiveWindow()
@@ -184,9 +184,9 @@ void WatchEngineTests::testDisabledRule()
 
     engine.evaluateEvent(event);
 
-    const auto signals = store.getWatchSignalsSince(
+    const auto watchSignals = store.getWatchSignalsSince(
         std::chrono::system_clock::time_point{});
-    QCOMPARE(static_cast<int>(signals.size()), 0);
+    QCOMPARE(static_cast<int>(watchSignals.size()), 0);
 }
 
 void WatchEngineTests::testPackageNameContains()
@@ -214,9 +214,9 @@ void WatchEngineTests::testPackageNameContains()
 
     engine.evaluateEvent(event);
 
-    const auto signals = store.getWatchSignalsSince(
+    const auto watchSignals = store.getWatchSignalsSince(
         std::chrono::system_clock::time_point{});
-    QCOMPARE(static_cast<int>(signals.size()), 1);
+    QCOMPARE(static_cast<int>(watchSignals.size()), 1);
 }
 
 QTEST_MAIN(WatchEngineTests)

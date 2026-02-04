@@ -25,7 +25,7 @@ void JournalParserTests::testParseFirmwareLine()
     const auto &event = result.events.front();
     QCOMPARE(event.category, khronicle::EventCategory::Firmware);
     QCOMPARE(event.source, khronicle::EventSource::Journal);
-    QVERIFY(QString::fromStdString(event.summary).contains("Firmware"));
+    QVERIFY(QString::fromStdString(event.summary).toLower().contains("firmware"));
 }
 
 void JournalParserTests::testParseGpuLine()

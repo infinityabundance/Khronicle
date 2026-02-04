@@ -6,9 +6,25 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Kirigami2 Test)
-find_package(nlohmann_json CONFIG REQUIRED)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Test Widgets Network)
+find_package(KF6Kirigami REQUIRED)
 find_package(SQLite3 REQUIRED)
+find_package(nlohmann_json CONFIG QUIET)
+if (NOT nlohmann_json_FOUND)
+    find_path(NLOHMANN_JSON_INCLUDE_DIR nlohmann/json.hpp
+        PATHS /usr/include
+        REQUIRED
+    )
+    add_library(nlohmann_json::nlohmann_json INTERFACE IMPORTED)
+    set_target_properties(nlohmann_json::nlohmann_json PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${NLOHMANN_JSON_INCLUDE_DIR}"
+    )
+endif()
+
+# Enable Qt MOC/RCC/UIC
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
 
 add_executable(khronicle-daemon
     src/daemon/main.cpp
@@ -35,6 +51,7 @@ target_include_directories(khronicle-daemon
 target_link_libraries(khronicle-daemon
     PRIVATE
         Qt6::Core
+        Qt6::Network
         nlohmann_json::nlohmann_json
         SQLite::SQLite3
 )
@@ -68,7 +85,7 @@ target_link_libraries(khronicle
         Qt6::Qml
         Qt6::Quick
         Qt6::QuickControls2
-        Qt6::Kirigami2
+        KF6::Kirigami
         nlohmann_json::nlohmann_json
 )
 
@@ -91,6 +108,8 @@ target_link_libraries(khronicle-tray
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
+        Qt6::Network
+        nlohmann_json::nlohmann_json
 )
 
 enable_testing()
@@ -101,6 +120,7 @@ add_executable(khronicle-report
     src/report/ReportCli.cpp
     src/daemon/change_explainer.cpp
     src/daemon/counterfactual.cpp
+    src/daemon/khronicle_store.cpp
     src/common/logging.cpp
     src/common/process_utils.cpp
     src/debug/scenario_capture.cpp
@@ -114,8 +134,14 @@ add_executable(khronicle-replay
     src/debug/scenario_capture.cpp
     src/daemon/khronicle_store.cpp
     src/daemon/khronicle_api_server.cpp
+    src/daemon/khronicle_daemon.cpp
     src/daemon/change_explainer.cpp
     src/daemon/counterfactual.cpp
+    src/daemon/pacman_parser.cpp
+    src/daemon/journal_parser.cpp
+    src/daemon/snapshot_builder.cpp
+    src/daemon/watch_engine.cpp
+    src/report/ReportCli.cpp
 )
 
 target_include_directories(khronicle-report
@@ -127,6 +153,7 @@ target_include_directories(khronicle-report
 target_link_libraries(khronicle-report
     PRIVATE
         Qt6::Core
+        Qt6::Network
         nlohmann_json::nlohmann_json
         SQLite::SQLite3
 )
@@ -140,6 +167,7 @@ target_include_directories(khronicle-replay
 target_link_libraries(khronicle-replay
     PRIVATE
         Qt6::Core
+        Qt6::Network
         nlohmann_json::nlohmann_json
         SQLite::SQLite3
 )

@@ -54,7 +54,7 @@ void KhronicleApiClient::connectToDaemon()
               QStringLiteral("local_socket"),
               logging::defaultWho(),
               QString(),
-              nlohmann::json{{"socketPath", socketPath().toStdString()}});
+              (nlohmann::json{{"socketPath", socketPath().toStdString()}}));
     m_socket->connectToServer(socketPath());
 }
 
@@ -153,7 +153,7 @@ void KhronicleApiClient::sendRequest(const QString &method,
                   QStringLiteral("local_socket"),
                   logging::defaultWho(),
                   QString(),
-                  nlohmann::json{{"method", method.toStdString()}});
+                  (nlohmann::json{{"method", method.toStdString()}}));
         return;
     }
 
@@ -178,8 +178,8 @@ void KhronicleApiClient::sendRequest(const QString &method,
                QStringLiteral("json_rpc"),
                logging::defaultWho(),
                QString(),
-               nlohmann::json{{"method", method.toStdString()},
-                              {"id", id}});
+               (nlohmann::json{{"method", method.toStdString()},
+                              {"id", id}}));
 }
 
 void KhronicleApiClient::handleResponse(const QJsonObject &obj)
@@ -201,8 +201,8 @@ void KhronicleApiClient::handleResponse(const QJsonObject &obj)
                   QStringLiteral("json_rpc"),
                   logging::defaultWho(),
                   QString(),
-                  nlohmann::json{{"method", pending.method.toStdString()},
-                                 {"id", id}});
+                  (nlohmann::json{{"method", pending.method.toStdString()},
+                                 {"id", id}}));
         return;
     }
 
@@ -221,8 +221,8 @@ void KhronicleApiClient::handleResponse(const QJsonObject &obj)
                QStringLiteral("json_rpc"),
                logging::defaultWho(),
                QString(),
-               nlohmann::json{{"method", pending.method.toStdString()},
-                              {"id", id}});
+               (nlohmann::json{{"method", pending.method.toStdString()},
+                              {"id", id}}));
 
     if (pending.method == "get_changes_since" || pending.method == "get_changes_between") {
         emit changesLoaded(convertEventsJsonToVariantList(result.value("events")));

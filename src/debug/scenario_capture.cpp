@@ -104,8 +104,8 @@ void ScenarioCapture::start(const QString &scenarioId,
               QStringLiteral("copy_db"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"scenarioId", scenarioId.toStdString()},
-                             {"dir", g_scenarioDir.toStdString()}});
+              (nlohmann::json{{"scenarioId", scenarioId.toStdString()},
+                             {"dir", g_scenarioDir.toStdString()}}));
 }
 
 void ScenarioCapture::recordStep(const nlohmann::json &step)

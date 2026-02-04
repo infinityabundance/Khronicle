@@ -38,7 +38,7 @@ bool DaemonController::startDaemonFromUi()
               QStringLiteral("systemd_or_fallback"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"success", result}});
+              (nlohmann::json{{"success", result}}));
     return result;
 }
 
@@ -53,7 +53,7 @@ bool DaemonController::stopDaemonFromUi()
               QStringLiteral("systemd_or_fallback"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"success", result}});
+              (nlohmann::json{{"success", result}}));
     return result;
 }
 
@@ -67,7 +67,7 @@ bool DaemonController::startTrayFromUi()
               QStringLiteral("process_start"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"success", result}});
+              (nlohmann::json{{"success", result}}));
     return result;
 }
 

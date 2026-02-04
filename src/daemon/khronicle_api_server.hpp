@@ -23,6 +23,9 @@ public:
 
     // Start listening on /run/user/$UID/khronicle.sock
     bool start();
+    // Process a single JSON-RPC payload without a socket round-trip.
+    // Useful for replay and test harnesses in environments without local sockets.
+    QByteArray handleRequestPayload(const QByteArray &payload);
 
 private slots:
     void handleNewConnection();

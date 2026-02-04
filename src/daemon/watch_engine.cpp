@@ -144,8 +144,8 @@ void WatchEngine::evaluateEvent(const KhronicleEvent &event)
                QStringLiteral("rule_match"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"eventId", event.id},
-                              {"rulesCached", m_rulesCache.size()}});
+               (nlohmann::json{{"eventId", event.id},
+                              {"rulesCached", m_rulesCache.size()}}));
     maybeReloadRules();
 
     for (const auto &rule : m_rulesCache) {
@@ -177,9 +177,9 @@ void WatchEngine::evaluateEvent(const KhronicleEvent &event)
                   QStringLiteral("persist_signal"),
                   khronicle::logging::defaultWho(),
                   QString(),
-                  nlohmann::json{{"ruleId", rule.id},
+                  (nlohmann::json{{"ruleId", rule.id},
                                  {"originId", event.id},
-                                 {"severity", toWatchSeverityString(rule.severity)}});
+                                 {"severity", toWatchSeverityString(rule.severity)}}));
         m_store.addWatchSignal(signal);
     }
 }
@@ -194,8 +194,8 @@ void WatchEngine::evaluateSnapshot(const SystemSnapshot &snapshot)
                QStringLiteral("rule_match"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"snapshotId", snapshot.id},
-                              {"rulesCached", m_rulesCache.size()}});
+               (nlohmann::json{{"snapshotId", snapshot.id},
+                              {"rulesCached", m_rulesCache.size()}}));
     maybeReloadRules();
 
     for (const auto &rule : m_rulesCache) {
@@ -227,9 +227,9 @@ void WatchEngine::evaluateSnapshot(const SystemSnapshot &snapshot)
                   QStringLiteral("persist_signal"),
                   khronicle::logging::defaultWho(),
                   QString(),
-                  nlohmann::json{{"ruleId", rule.id},
+                  (nlohmann::json{{"ruleId", rule.id},
                                  {"originId", snapshot.id},
-                                 {"severity", toWatchSeverityString(rule.severity)}});
+                                 {"severity", toWatchSeverityString(rule.severity)}}));
         m_store.addWatchSignal(signal);
     }
 }
@@ -252,7 +252,7 @@ void WatchEngine::maybeReloadRules()
                QStringLiteral("sqlite_query"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"ruleCount", m_rulesCache.size()}});
+               (nlohmann::json{{"ruleCount", m_rulesCache.size()}}));
 }
 
 bool WatchEngine::ruleMatchesEvent(const WatchRule &rule,

@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
               QStringLiteral("qt_app"),
               khronicle::logging::defaultWho(),
               QString(),
-              nlohmann::json{{"fleetMode", parser.isSet(fleetOption)}});
+              (nlohmann::json{{"fleetMode", parser.isSet(fleetOption)}}));
 
     if (!parser.isSet(fleetOption)) {
         if (!khronicle::isDaemonRunning()) {

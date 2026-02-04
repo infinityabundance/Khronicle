@@ -104,7 +104,7 @@ void WatchClient::sendRequest(const QString &method, const QJsonObject &params)
                   QStringLiteral("local_socket"),
                   logging::defaultWho(),
                   QString(),
-                  nlohmann::json{{"method", method.toStdString()}});
+                  (nlohmann::json{{"method", method.toStdString()}}));
         return;
     }
 
@@ -129,8 +129,8 @@ void WatchClient::sendRequest(const QString &method, const QJsonObject &params)
                QStringLiteral("json_rpc"),
                logging::defaultWho(),
                QString(),
-               nlohmann::json{{"method", method.toStdString()},
-                              {"id", id}});
+               (nlohmann::json{{"method", method.toStdString()},
+                              {"id", id}}));
 }
 
 void WatchClient::handleResponse(const QJsonObject &obj)
@@ -151,8 +151,8 @@ void WatchClient::handleResponse(const QJsonObject &obj)
                   QStringLiteral("json_rpc"),
                   logging::defaultWho(),
                   QString(),
-                  nlohmann::json{{"method", pending.method.toStdString()},
-                                 {"id", id}});
+                  (nlohmann::json{{"method", pending.method.toStdString()},
+                                 {"id", id}}));
         return;
     }
 
@@ -170,8 +170,8 @@ void WatchClient::handleResponse(const QJsonObject &obj)
                QStringLiteral("json_rpc"),
                logging::defaultWho(),
                QString(),
-               nlohmann::json{{"method", pending.method.toStdString()},
-                              {"id", id}});
+               (nlohmann::json{{"method", pending.method.toStdString()},
+                              {"id", id}}));
     if (pending.method == "list_watch_rules") {
         emit rulesLoaded(result.value("rules").toArray().toVariantList());
         return;
