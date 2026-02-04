@@ -16,12 +16,16 @@ class KhronicleApiServer;
 class WatchEngine;
 
 /**
- * KhronicleDaemon coordinates:
- * - periodic parsing of pacman.log and systemd journal
- * - building system snapshots
- * - persisting events and snapshots into KhronicleStore
+ * KhronicleDaemon orchestrates ingestion and API serving for a single host.
  *
- * It is designed to be owned from main() and driven by Qt's event loop.
+ * Responsibilities:
+ * - Periodically ingest new pacman and journal entries.
+ * - Build and persist system snapshots in SQLite.
+ * - Evaluate watch rules and record watch signals.
+ * - Serve a local JSON-RPC API for UI and tools.
+ *
+ * This class is owned by main() in khronicle-daemon and lives for the
+ * lifetime of the daemon process.
  */
 class KhronicleDaemon : public QObject
 {

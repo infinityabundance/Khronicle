@@ -9,6 +9,8 @@
 
 namespace khronicle {
 
+// WatchEngine evaluates declarative watch rules against events and snapshots.
+// It records matches as WatchSignal entries in the store.
 class WatchEngine {
 public:
     explicit WatchEngine(KhronicleStore &store);

@@ -204,6 +204,7 @@ nlohmann::json readJsonFile(const QString &path)
 
 int ReportCli::run(int argc, char *argv[])
 {
+    // CLI entry: parse the subcommand and delegate to the report handler.
     QStringList args;
     args.reserve(argc);
     for (int i = 0; i < argc; ++i) {
@@ -238,6 +239,7 @@ int ReportCli::run(int argc, char *argv[])
 
 int ReportCli::runTimelineReport(const QStringList &args)
 {
+    // Timeline reports read events between two timestamps and render them.
     const QString fromValue = getArgValue(args, QStringLiteral("--from"));
     const QString toValue = getArgValue(args, QStringLiteral("--to"));
 
@@ -273,6 +275,7 @@ int ReportCli::runTimelineReport(const QStringList &args)
 
 int ReportCli::runDiffReport(const QStringList &args)
 {
+    // Diff reports compare two snapshots by id and render the delta.
     const QString snapshotAId = getArgValue(args, QStringLiteral("--snapshot-a"));
     const QString snapshotBId = getArgValue(args, QStringLiteral("--snapshot-b"));
 
@@ -310,6 +313,7 @@ int ReportCli::runDiffReport(const QStringList &args)
 
 int ReportCli::runExplainReport(const QStringList &args)
 {
+    // Explain reports use counterfactual logic to summarize change causes.
     const QString fromValue = getArgValue(args, QStringLiteral("--from"));
     const QString toValue = getArgValue(args, QStringLiteral("--to"));
 
@@ -365,6 +369,7 @@ int ReportCli::runExplainReport(const QStringList &args)
 
 int ReportCli::runBundleReport(const QStringList &args)
 {
+    // Bundle reports export events/snapshots into a portable archive.
     const QString fromValue = getArgValue(args, QStringLiteral("--from"));
     const QString toValue = getArgValue(args, QStringLiteral("--to"));
     const QString outPath = getArgValue(args, QStringLiteral("--out"));
@@ -453,6 +458,7 @@ int ReportCli::runBundleReport(const QStringList &args)
 
 int ReportCli::runAggregateReport(const QStringList &args)
 {
+    // Aggregate reports merge multiple bundles for fleet review.
     const QString inputPath = getArgValue(args, QStringLiteral("--input"));
     const QString outPath = getArgValue(args, QStringLiteral("--out"));
     const QString format = getFormat(args);

@@ -15,6 +15,7 @@ int main(int argc, char *argv[])
 
     app.setQuitOnLastWindowClosed(false);
 
+    // Tray runs as a background UI with periodic daemon queries.
     KhronicleTray tray;
 
     return app.exec();

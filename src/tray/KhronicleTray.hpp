@@ -5,6 +5,7 @@
 #include <QMenu>
 #include <QTimer>
 
+// KhronicleTray provides a minimal tray UI for quick, local summaries.
 class KhronicleTray : public QObject
 {
     Q_OBJECT

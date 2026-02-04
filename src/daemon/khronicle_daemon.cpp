@@ -77,6 +77,7 @@ void KhronicleDaemon::start()
         m_apiServer->start();
     }
 
+    // Timer-driven ingestion loop: keep work bounded and predictable.
     auto *timer = new QTimer(this);
     timer->setInterval(kIngestionIntervalMs);
     connect(timer, &QTimer::timeout, this, &KhronicleDaemon::runIngestionCycle);
@@ -87,6 +88,11 @@ void KhronicleDaemon::start()
 
 void KhronicleDaemon::runIngestionCycle()
 {
+    // One ingestion cycle:
+    // 1) pacman log ingestion
+    // 2) journal ingestion
+    // 3) snapshot check + optional event emission
+    // 4) persist resume state to the meta table
     runPacmanIngestion();
     runJournalIngestion();
     runSnapshotCheck();
@@ -95,6 +101,7 @@ void KhronicleDaemon::runIngestionCycle()
 
 void KhronicleDaemon::runPacmanIngestion()
 {
+    // Parse new pacman log entries from the last cursor.
     const PacmanParseResult result =
         parsePacmanLog("/var/log/pacman.log", m_pacmanCursor);
 
@@ -114,6 +121,7 @@ void KhronicleDaemon::runPacmanIngestion()
 
 void KhronicleDaemon::runJournalIngestion()
 {
+    // Parse journal entries since the last observed timestamp.
     const JournalParseResult result = parseJournalSince(m_journalLastTimestamp);
 
     const std::string hostId = m_store->getHostIdentity().hostId;
@@ -132,6 +140,8 @@ void KhronicleDaemon::runJournalIngestion()
 
 void KhronicleDaemon::runSnapshotCheck()
 {
+    // Snapshot builder captures point-in-time system state. We only write a new
+    // snapshot when kernel changes (current heuristic).
     SystemSnapshot current = buildCurrentSnapshot();
     current.hostIdentity = m_store->getHostIdentity();
 

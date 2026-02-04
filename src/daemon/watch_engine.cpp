@@ -134,6 +134,8 @@ WatchEngine::WatchEngine(KhronicleStore &store)
 
 void WatchEngine::evaluateEvent(const KhronicleEvent &event)
 {
+    // Evaluate all enabled event-scope rules against this event and persist
+    // WatchSignal records for any matches.
     maybeReloadRules();
 
     for (const auto &rule : m_rulesCache) {
@@ -164,6 +166,7 @@ void WatchEngine::evaluateEvent(const KhronicleEvent &event)
 
 void WatchEngine::evaluateSnapshot(const SystemSnapshot &snapshot)
 {
+    // Evaluate all enabled snapshot-scope rules against this snapshot.
     maybeReloadRules();
 
     for (const auto &rule : m_rulesCache) {
@@ -194,6 +197,7 @@ void WatchEngine::evaluateSnapshot(const SystemSnapshot &snapshot)
 
 void WatchEngine::maybeReloadRules()
 {
+    // Cache rules to keep ingestion cycles fast. Reload periodically.
     const auto now = std::chrono::system_clock::now();
     if (!m_rulesCache.empty()
         && now - m_lastRulesReload < kRulesReloadInterval) {
@@ -207,6 +211,7 @@ void WatchEngine::maybeReloadRules()
 bool WatchEngine::ruleMatchesEvent(const WatchRule &rule,
                                    const KhronicleEvent &event) const
 {
+    // Declarative, transparent matching rules. No scripting or code execution.
     if (!withinActiveWindow(rule, event.timestamp)) {
         return false;
     }
@@ -238,6 +243,8 @@ bool WatchEngine::ruleMatchesEvent(const WatchRule &rule,
 bool WatchEngine::ruleMatchesSnapshot(const WatchRule &rule,
                                       const SystemSnapshot &snapshot) const
 {
+    // Snapshot rules match against the snapshot's summarized state (key packages,
+    // firmware versions, etc.) rather than specific events.
     if (!withinActiveWindow(rule, snapshot.timestamp)) {
         return false;
     }
@@ -284,6 +291,8 @@ bool WatchEngine::ruleMatchesSnapshot(const WatchRule &rule,
 bool WatchEngine::withinActiveWindow(const WatchRule &rule,
                                      std::chrono::system_clock::time_point t) const
 {
+    // Active windows define a local-time maintenance window. Rules apply only
+    // outside that window (i.e., inside = safe/maintenance time).
     if (rule.activeFrom.empty() || rule.activeTo.empty()) {
         return true;
     }

@@ -288,6 +288,8 @@ struct KhronicleStore::Impl {
 KhronicleStore::KhronicleStore()
     : impl(std::make_unique<Impl>())
 {
+    // Store lives in the user's home directory. This keeps Khronicle local and
+    // portable (no root dependency).
     const char *home = std::getenv("HOME");
     std::filesystem::path basePath = home ? home : ".";
     basePath /= ".local/share/khronicle";
@@ -298,6 +300,7 @@ KhronicleStore::KhronicleStore()
         throw std::runtime_error("failed to open khronicle database");
     }
 
+    // Schema setup is idempotent; new tables/columns are created on startup.
     execOrThrow(impl->db, kCreateEventsTable);
     execOrThrow(impl->db, kCreateSnapshotsTable);
     execOrThrow(impl->db, kCreateMetaTable);
@@ -379,6 +382,7 @@ void KhronicleStore::addEvent(const KhronicleEvent &event)
     bindJson(stmt.get(), 7, event.beforeState);
     bindJson(stmt.get(), 8, event.afterState);
     bindJson(stmt.get(), 9, nlohmann::json(event.relatedPackages));
+    // Default to the store's host identity if the event didn't set one.
     bindText(stmt.get(), 10, event.hostId.empty() ? impl->hostIdentity.hostId : event.hostId);
 
     if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
@@ -398,6 +402,7 @@ void KhronicleStore::addSnapshot(const SystemSnapshot &snapshot)
     bindJson(stmt.get(), 4, snapshot.gpuDriver);
     bindJson(stmt.get(), 5, snapshot.firmwareVersions);
     bindJson(stmt.get(), 6, snapshot.keyPackages);
+    // Ensure snapshots carry a stable host identity.
     bindText(stmt.get(), 7, snapshot.hostIdentity.hostId.empty()
         ? impl->hostIdentity.hostId
         : snapshot.hostIdentity.hostId);

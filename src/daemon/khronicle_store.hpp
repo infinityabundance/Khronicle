@@ -10,15 +10,19 @@
 
 namespace khronicle {
 
+// KhronicleStore is the SQLite access layer for all persistent data:
+// events, snapshots, meta, host identity, watch rules, and watch signals.
 class KhronicleStore {
 public:
     KhronicleStore();
     ~KhronicleStore();
 
+    // Event and snapshot persistence API used by the daemon.
     void addEvent(const KhronicleEvent &event);
     void addSnapshot(const SystemSnapshot &snapshot);
     HostIdentity getHostIdentity() const;
 
+    // Watchpoint rules and signals. Rules are editable, signals are append-only.
     std::vector<WatchRule> listWatchRules() const;
     void upsertWatchRule(const WatchRule &rule);
     void deleteWatchRule(const std::string &id);
@@ -27,6 +31,7 @@ public:
     std::vector<WatchSignal> getWatchSignalsSince(
         std::chrono::system_clock::time_point t) const;
 
+    // Query event history for API and reports.
     std::vector<KhronicleEvent> getEventsSince(
         std::chrono::system_clock::time_point since) const;
     std::vector<KhronicleEvent> getEventsBetween(

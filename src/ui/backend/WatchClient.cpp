@@ -89,6 +89,7 @@ void WatchClient::loadSignalsSince(const QDateTime &since)
 
 void WatchClient::sendRequest(const QString &method, const QJsonObject &params)
 {
+    // WatchClient mirrors KhronicleApiClient but only for rule/signal endpoints.
     if (m_socket->state() != QLocalSocket::ConnectedState) {
         connectToDaemon();
         emit errorOccurred(QStringLiteral("Not connected to Khronicle daemon"));
@@ -112,6 +113,7 @@ void WatchClient::sendRequest(const QString &method, const QJsonObject &params)
 
 void WatchClient::handleResponse(const QJsonObject &obj)
 {
+    // Resolve request IDs and emit QML-friendly data.
     const int id = obj.value("id").toInt(-1);
     if (!m_pending.contains(id)) {
         return;
