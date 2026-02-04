@@ -1,0 +1,19 @@
+{
+  "id": "example-bug-1",
+  "title": "Example: snapshot diff mismatch",
+  "description": "Minimal example showing a diff request with two snapshots. Replace with a real capture when reproducing a bug.",
+  "khronicleVersion": "0.1.0",
+  "entryPoint": "api_request",
+  "steps": [
+    {
+      "action": "api_call",
+      "context": {
+        "method": "diff_snapshots",
+        "params": {
+          "a": "snapshot-a",
+          "b": "snapshot-b"
+        }
+      }
+    }
+  ]
+}

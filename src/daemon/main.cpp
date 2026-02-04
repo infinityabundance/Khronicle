@@ -5,6 +5,7 @@
 
 #include "daemon/khronicle_daemon.hpp"
 #include "common/logging.hpp"
+#include "debug/scenario_capture.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -28,6 +29,16 @@ int main(int argc, char *argv[])
               khronicle::logging::defaultWho(),
               QString(),
               nlohmann::json::object());
+
+    if (qEnvironmentVariableIntValue("KHRONICLE_SCENARIO_CAPTURE") == 1) {
+        const QString scenarioId = qEnvironmentVariable("KHRONICLE_SCENARIO_ID");
+        const QString title = qEnvironmentVariable("KHRONICLE_SCENARIO_TITLE");
+        const QString desc = qEnvironmentVariable("KHRONICLE_SCENARIO_DESC");
+        if (qEnvironmentVariable("KHRONICLE_SCENARIO_ENTRY").isEmpty()) {
+            qputenv("KHRONICLE_SCENARIO_ENTRY", "daemon_ingestion_cycle");
+        }
+        khronicle::ScenarioCapture::start(scenarioId, title, desc);
+    }
 
     // The daemon lives for the lifetime of the process.
     khronicle::KhronicleDaemon daemon;

@@ -36,6 +36,7 @@ public:
 
     // Call this after constructing the daemon to set up timers and start periodic work.
     void start();
+    void runIngestionCycleForReplay();
 
 private slots:
     void runIngestionCycle();

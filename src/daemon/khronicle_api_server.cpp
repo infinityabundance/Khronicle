@@ -13,6 +13,7 @@
 
 #include "common/json_utils.hpp"
 #include "common/logging.hpp"
+#include "debug/scenario_capture.hpp"
 #include "daemon/counterfactual.hpp"
 
 namespace khronicle {
@@ -195,6 +196,13 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
               corrId,
               nlohmann::json{{"method", method},
                              {"paramKeys", paramKeys}});
+
+    if (ScenarioCapture::isEnabled()) {
+        ScenarioCapture::recordStep(nlohmann::json{
+            {"action", "api_call"},
+            {"context", {{"method", method}, {"params", params}}}
+        });
+    }
 
     auto start = std::chrono::steady_clock::now();
     try {

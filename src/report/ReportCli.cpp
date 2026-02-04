@@ -13,6 +13,7 @@
 #include "common/json_utils.hpp"
 #include "common/models.hpp"
 #include "common/logging.hpp"
+#include "debug/scenario_capture.hpp"
 #include "daemon/khronicle_store.hpp"
 #include "daemon/counterfactual.hpp"
 
@@ -226,6 +227,12 @@ int ReportCli::run(int argc, char *argv[])
               khronicle::logging::defaultWho(),
               QString(),
               nlohmann::json{{"command", command.toStdString()}});
+    if (ScenarioCapture::isEnabled()) {
+        ScenarioCapture::recordStep(nlohmann::json{
+            {"action", "report_cli"},
+            {"context", {{"command", command.toStdString()}}}
+        });
+    }
     if (command == QStringLiteral("timeline")) {
         return runTimelineReport(args);
     }

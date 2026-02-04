@@ -40,6 +40,10 @@ QString levelToString(LogLevel level)
 
 QString logsDirPath()
 {
+    const QString overridePath = qEnvironmentVariable("KHRONICLE_LOG_DIR");
+    if (!overridePath.isEmpty()) {
+        return overridePath;
+    }
     const QString home = qEnvironmentVariable("HOME");
     if (home.isEmpty()) {
         return QStringLiteral(".local/share/khronicle/logs");

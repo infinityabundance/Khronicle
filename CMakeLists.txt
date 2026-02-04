@@ -22,6 +22,7 @@ add_executable(khronicle-daemon
     src/daemon/khronicle_daemon.cpp
     src/daemon/watch_engine.cpp
     src/common/logging.cpp
+    src/debug/scenario_capture.cpp
 )
 
 target_include_directories(khronicle-daemon
@@ -43,6 +44,7 @@ add_executable(khronicle
     src/ui/backend/FleetModel.cpp
     src/ui/backend/WatchClient.cpp
     src/common/logging.cpp
+    src/debug/scenario_capture.cpp
 )
 
 target_include_directories(khronicle
@@ -71,6 +73,7 @@ add_executable(khronicle-tray
     src/tray/main.cpp
     src/tray/KhronicleTray.cpp
     src/common/logging.cpp
+    src/debug/scenario_capture.cpp
 )
 
 target_include_directories(khronicle-tray
@@ -95,6 +98,18 @@ add_executable(khronicle-report
     src/daemon/change_explainer.cpp
     src/daemon/counterfactual.cpp
     src/common/logging.cpp
+    src/debug/scenario_capture.cpp
+)
+
+add_executable(khronicle-replay
+    src/replay/main.cpp
+    src/replay/ReplayHarness.cpp
+    src/common/logging.cpp
+    src/debug/scenario_capture.cpp
+    src/daemon/khronicle_store.cpp
+    src/daemon/khronicle_api_server.cpp
+    src/daemon/change_explainer.cpp
+    src/daemon/counterfactual.cpp
 )
 
 target_include_directories(khronicle-report
@@ -110,7 +125,24 @@ target_link_libraries(khronicle-report
         SQLite::SQLite3
 )
 
+target_include_directories(khronicle-replay
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common
+)
+
+target_link_libraries(khronicle-replay
+    PRIVATE
+        Qt6::Core
+        nlohmann_json::nlohmann_json
+        SQLite::SQLite3
+)
+
 install(TARGETS khronicle khronicle-daemon khronicle-tray khronicle-report
+    RUNTIME DESTINATION bin
+)
+
+install(TARGETS khronicle-replay
     RUNTIME DESTINATION bin
 )
 

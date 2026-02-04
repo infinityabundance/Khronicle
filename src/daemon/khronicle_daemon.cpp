@@ -12,6 +12,7 @@
 #include "daemon/watch_engine.hpp"
 #include "common/json_utils.hpp"
 #include "common/logging.hpp"
+#include "debug/scenario_capture.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -116,6 +117,13 @@ void KhronicleDaemon::runIngestionCycle()
               corrId,
               nlohmann::json{{"cycleIndex", cycleIndex}});
 
+    if (ScenarioCapture::isEnabled()) {
+        ScenarioCapture::recordStep(nlohmann::json{
+            {"action", "run_ingestion_cycle"},
+            {"context", {{"cycleIndex", cycleIndex}}}
+        });
+    }
+
     runPacmanIngestion();
     runJournalIngestion();
     runSnapshotCheck();
@@ -133,9 +141,16 @@ void KhronicleDaemon::runIngestionCycle()
               nlohmann::json{{"durationMs", elapsedMs}});
 }
 
+void KhronicleDaemon::runIngestionCycleForReplay()
+{
+    runIngestionCycle();
+}
+
 void KhronicleDaemon::runPacmanIngestion()
 {
     // Parse new pacman log entries from the last cursor.
+    const char *overridePath = std::getenv("KHRONICLE_PACMAN_LOG_PATH");
+    const std::string logPath = overridePath ? overridePath : "/var/log/pacman.log";
     KLOG_DEBUG(QStringLiteral("KhronicleDaemon"),
                QStringLiteral("runPacmanIngestion"),
                QStringLiteral("ingest_pacman_start"),
@@ -143,9 +158,10 @@ void KhronicleDaemon::runPacmanIngestion()
                QStringLiteral("parse_log"),
                khronicle::logging::defaultWho(),
                QString(),
-               nlohmann::json{{"cursor", m_pacmanCursor.value_or("")}});
+               nlohmann::json{{"cursor", m_pacmanCursor.value_or("")},
+                              {"path", logPath}});
     const PacmanParseResult result =
-        parsePacmanLog("/var/log/pacman.log", m_pacmanCursor);
+        parsePacmanLog(logPath, m_pacmanCursor);
 
     const std::string hostId = m_store->getHostIdentity().hostId;
     size_t ingested = 0;
@@ -216,6 +232,17 @@ void KhronicleDaemon::runSnapshotCheck()
 {
     // Snapshot builder captures point-in-time system state. We only write a new
     // snapshot when kernel changes (current heuristic).
+    if (qEnvironmentVariableIntValue("KHRONICLE_REPLAY_NO_SNAPSHOT") == 1) {
+        KLOG_INFO(QStringLiteral("KhronicleDaemon"),
+                  QStringLiteral("runSnapshotCheck"),
+                  QStringLiteral("snapshot_skipped"),
+                  QStringLiteral("replay_mode"),
+                  QStringLiteral("skip_snapshot"),
+                  khronicle::logging::defaultWho(),
+                  QString(),
+                  nlohmann::json::object());
+        return;
+    }
     KLOG_DEBUG(QStringLiteral("KhronicleDaemon"),
                QStringLiteral("runSnapshotCheck"),
                QStringLiteral("snapshot_check_start"),
