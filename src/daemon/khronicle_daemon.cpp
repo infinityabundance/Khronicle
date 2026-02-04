@@ -96,7 +96,9 @@ void KhronicleDaemon::runPacmanIngestion()
     const PacmanParseResult result =
         parsePacmanLog("/var/log/pacman.log", m_pacmanCursor);
 
-    for (const auto &event : result.events) {
+    const std::string hostId = m_store->getHostIdentity().hostId;
+    for (auto event : result.events) {
+        event.hostId = hostId;
         m_store->addEvent(event);
     }
 
@@ -109,7 +111,9 @@ void KhronicleDaemon::runJournalIngestion()
 {
     const JournalParseResult result = parseJournalSince(m_journalLastTimestamp);
 
-    for (const auto &event : result.events) {
+    const std::string hostId = m_store->getHostIdentity().hostId;
+    for (auto event : result.events) {
+        event.hostId = hostId;
         m_store->addEvent(event);
     }
 
@@ -121,6 +125,7 @@ void KhronicleDaemon::runJournalIngestion()
 void KhronicleDaemon::runSnapshotCheck()
 {
     SystemSnapshot current = buildCurrentSnapshot();
+    current.hostIdentity = m_store->getHostIdentity();
 
     if (!m_lastSnapshot.has_value()) {
         m_store->addSnapshot(current);
@@ -151,6 +156,7 @@ void KhronicleDaemon::runSnapshotCheck()
     event.beforeState["kernelVersion"] = m_lastSnapshot->kernelVersion;
     event.afterState["kernelVersion"] = current.kernelVersion;
     event.relatedPackages = {detectKernelPackage(current)};
+    event.hostId = current.hostIdentity.hostId;
 
     m_store->addEvent(event);
     m_lastSnapshot = current;

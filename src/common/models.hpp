@@ -10,6 +10,14 @@
 
 namespace khronicle {
 
+struct HostIdentity {
+    std::string hostId;
+    std::string hostname;
+    std::string displayName;
+    std::string os;
+    std::string hardware;
+};
+
 struct KhronicleEvent {
     std::string id;
     std::chrono::system_clock::time_point timestamp;
@@ -20,6 +28,7 @@ struct KhronicleEvent {
     nlohmann::json beforeState;
     nlohmann::json afterState;
     std::vector<std::string> relatedPackages;
+    std::string hostId;
 };
 
 struct SystemSnapshot {
@@ -29,6 +38,7 @@ struct SystemSnapshot {
     nlohmann::json gpuDriver;
     nlohmann::json firmwareVersions;
     nlohmann::json keyPackages;
+    HostIdentity hostIdentity;
 };
 
 struct KhronicleDiff {

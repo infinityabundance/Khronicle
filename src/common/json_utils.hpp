@@ -147,6 +147,26 @@ inline void from_json(const nlohmann::json &j, EventSource &source)
     }
 }
 
+inline void to_json(nlohmann::json &j, const HostIdentity &identity)
+{
+    j = nlohmann::json{
+        {"hostId", identity.hostId},
+        {"hostname", identity.hostname},
+        {"displayName", identity.displayName},
+        {"os", identity.os},
+        {"hardware", identity.hardware}
+    };
+}
+
+inline void from_json(const nlohmann::json &j, HostIdentity &identity)
+{
+    identity.hostId = j.value("hostId", "");
+    identity.hostname = j.value("hostname", "");
+    identity.displayName = j.value("displayName", "");
+    identity.os = j.value("os", "");
+    identity.hardware = j.value("hardware", "");
+}
+
 inline void to_json(nlohmann::json &j, const KhronicleEvent &event)
 {
     j = nlohmann::json{
@@ -158,7 +178,8 @@ inline void to_json(nlohmann::json &j, const KhronicleEvent &event)
         {"details", event.details},
         {"beforeState", event.beforeState},
         {"afterState", event.afterState},
-        {"relatedPackages", event.relatedPackages}
+        {"relatedPackages", event.relatedPackages},
+        {"hostId", event.hostId}
     };
 }
 
@@ -193,6 +214,7 @@ inline void from_json(const nlohmann::json &j, KhronicleEvent &event)
     } else {
         event.relatedPackages.clear();
     }
+    event.hostId = j.value("hostId", "");
 }
 
 inline void to_json(nlohmann::json &j, const SystemSnapshot &snapshot)
@@ -203,7 +225,8 @@ inline void to_json(nlohmann::json &j, const SystemSnapshot &snapshot)
         {"kernelVersion", snapshot.kernelVersion},
         {"gpuDriver", snapshot.gpuDriver},
         {"firmwareVersions", snapshot.firmwareVersions},
-        {"keyPackages", snapshot.keyPackages}
+        {"keyPackages", snapshot.keyPackages},
+        {"hostIdentity", snapshot.hostIdentity}
     };
 }
 
@@ -226,6 +249,11 @@ inline void from_json(const nlohmann::json &j, SystemSnapshot &snapshot)
         snapshot.keyPackages = j.at("keyPackages");
     } else {
         snapshot.keyPackages = nlohmann::json::object();
+    }
+    if (j.contains("hostIdentity") && j.at("hostIdentity").is_object()) {
+        snapshot.hostIdentity = j.at("hostIdentity").get<HostIdentity>();
+    } else {
+        snapshot.hostIdentity = HostIdentity{};
     }
 }
 
