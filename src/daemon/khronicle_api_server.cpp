@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <vector>
 
 #include <QFile>
 #include <QStandardPaths>
@@ -10,6 +11,7 @@
 #include <unistd.h>
 
 #include "common/json_utils.hpp"
+#include "common/khronicle_version.hpp"
 
 namespace khronicle {
 
@@ -72,13 +74,13 @@ bool KhronicleApiServer::start()
 
     if (QFile::exists(socketPath)) {
         if (!QLocalServer::removeServer(socketPath)) {
-            qWarning() << "Failed to remove existing Khronicle socket" << socketPath;
+            qWarning() << "Khronicle: failed to remove existing socket" << socketPath;
             return false;
         }
     }
 
     if (!m_server.listen(socketPath)) {
-        qWarning() << "Failed to listen on Khronicle socket" << socketPath
+        qWarning() << "Khronicle: failed to listen on socket" << socketPath
                    << m_server.errorString();
         return false;
     }
@@ -86,7 +88,7 @@ bool KhronicleApiServer::start()
     connect(&m_server, &QLocalServer::newConnection,
             this, &KhronicleApiServer::handleNewConnection);
 
-    qInfo() << "Khronicle API server listening on" << socketPath;
+    qInfo() << "Khronicle: API server listening on" << socketPath;
     return true;
 }
 
@@ -290,7 +292,7 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             socket->write(response);
         } else if (method == "get_daemon_status") {
             nlohmann::json result;
-            result["version"] = "0.1.0";
+            result["version"] = KHRONICLE_VERSION;
 
             if (const auto cursor = m_store.getMeta("pacman_last_cursor")) {
                 result["pacmanLastCursor"] = *cursor;

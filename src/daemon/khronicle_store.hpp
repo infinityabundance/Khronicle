@@ -32,6 +32,9 @@ public:
     std::optional<std::string> getMeta(const std::string &key) const;
     void setMeta(const std::string &key, const std::string &value);
 
+    // Returns true if SQLite integrity_check reports ok.
+    bool integrityCheck(std::string *message = nullptr) const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl;

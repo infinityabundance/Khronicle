@@ -6,6 +6,7 @@
 #include <QCoreApplication>
 #include <QDateTime>
 
+#include "common/khronicle_version.hpp"
 #include "common/json_utils.hpp"
 #include "common/models.hpp"
 #include "daemon/khronicle_store.hpp"
@@ -17,6 +18,7 @@ namespace {
 QString usageText()
 {
     return QStringLiteral(
+        "Khronicle-Report " KHRONICLE_VERSION "\n"
         "Usage:\n"
         "  khronicle-report timeline --from ISO --to ISO [--format markdown|json]\n"
         "  khronicle-report diff --snapshot-a ID --snapshot-b ID [--format markdown|json]\n");
@@ -176,6 +178,7 @@ int ReportCli::run(int argc, char *argv[])
     }
 
     if (args.size() < 2) {
+        std::cerr << "Khronicle-Report: missing command.\n";
         std::cerr << usageText().toStdString();
         return 1;
     }
@@ -188,6 +191,7 @@ int ReportCli::run(int argc, char *argv[])
         return runDiffReport(args);
     }
 
+    std::cerr << "Khronicle-Report: unknown command.\n";
     std::cerr << usageText().toStdString();
     return 1;
 }
@@ -198,6 +202,7 @@ int ReportCli::runTimelineReport(const QStringList &args)
     const QString toValue = getArgValue(args, QStringLiteral("--to"));
 
     if (fromValue.isEmpty() || toValue.isEmpty()) {
+        std::cerr << "Khronicle-Report: missing --from/--to.\n";
         std::cerr << usageText().toStdString();
         return 1;
     }
@@ -205,23 +210,29 @@ int ReportCli::runTimelineReport(const QStringList &args)
     const auto from = parseIso8601(fromValue);
     const auto to = parseIso8601(toValue);
     if (!from.has_value() || !to.has_value()) {
-        std::cerr << "Invalid ISO8601 timestamp." << std::endl;
+        std::cerr << "Khronicle-Report: invalid ISO8601 timestamp.\n";
         return 1;
     }
 
     const QString format = getFormat(args);
     if (format != QStringLiteral("markdown") && format != QStringLiteral("json")) {
-        std::cerr << "Invalid format. Use markdown or json." << std::endl;
+        std::cerr << "Khronicle-Report: invalid format. Use markdown or json.\n";
         return 1;
     }
 
-    KhronicleStore store;
-    const auto events = store.getEventsBetween(*from, *to);
+    try {
+        KhronicleStore store;
+        const auto events = store.getEventsBetween(*from, *to);
 
-    if (format == QStringLiteral("json")) {
-        renderTimelineJson(events, *from, *to);
-    } else {
-        renderTimelineMarkdown(events, *from, *to);
+        if (format == QStringLiteral("json")) {
+            renderTimelineJson(events, *from, *to);
+        } else {
+            renderTimelineMarkdown(events, *from, *to);
+        }
+    } catch (const std::exception &ex) {
+        std::cerr << "Khronicle-Report: failed to open database: " << ex.what()
+                  << "\n";
+        return 1;
     }
 
     return 0;
@@ -233,32 +244,39 @@ int ReportCli::runDiffReport(const QStringList &args)
     const QString snapshotBId = getArgValue(args, QStringLiteral("--snapshot-b"));
 
     if (snapshotAId.isEmpty() || snapshotBId.isEmpty()) {
+        std::cerr << "Khronicle-Report: missing --snapshot-a/--snapshot-b.\n";
         std::cerr << usageText().toStdString();
         return 1;
     }
 
     const QString format = getFormat(args);
     if (format != QStringLiteral("markdown") && format != QStringLiteral("json")) {
-        std::cerr << "Invalid format. Use markdown or json." << std::endl;
+        std::cerr << "Khronicle-Report: invalid format. Use markdown or json.\n";
         return 1;
     }
 
-    KhronicleStore store;
-    const auto snapshotA = store.getSnapshot(snapshotAId.toStdString());
-    const auto snapshotB = store.getSnapshot(snapshotBId.toStdString());
+    try {
+        KhronicleStore store;
+        const auto snapshotA = store.getSnapshot(snapshotAId.toStdString());
+        const auto snapshotB = store.getSnapshot(snapshotBId.toStdString());
 
-    if (!snapshotA.has_value() || !snapshotB.has_value()) {
-        std::cerr << "Snapshot not found." << std::endl;
+        if (!snapshotA.has_value() || !snapshotB.has_value()) {
+            std::cerr << "Khronicle-Report: snapshot not found.\n";
+            return 1;
+        }
+
+        const KhronicleDiff diff =
+            store.diffSnapshots(snapshotAId.toStdString(), snapshotBId.toStdString());
+
+        if (format == QStringLiteral("json")) {
+            renderDiffJson(diff, &*snapshotA, &*snapshotB);
+        } else {
+            renderDiffMarkdown(diff, &*snapshotA, &*snapshotB);
+        }
+    } catch (const std::exception &ex) {
+        std::cerr << "Khronicle-Report: failed to open database: " << ex.what()
+                  << "\n";
         return 1;
-    }
-
-    const KhronicleDiff diff =
-        store.diffSnapshots(snapshotAId.toStdString(), snapshotBId.toStdString());
-
-    if (format == QStringLiteral("json")) {
-        renderDiffJson(diff, &*snapshotA, &*snapshotB);
-    } else {
-        renderDiffMarkdown(diff, &*snapshotA, &*snapshotB);
     }
 
     return 0;

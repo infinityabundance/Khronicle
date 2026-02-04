@@ -47,6 +47,7 @@ private:
 
     std::unique_ptr<KhronicleStore> m_store;
     std::unique_ptr<KhronicleApiServer> m_apiServer;
+    bool m_ingestionEnabled = true;
 
     // In-memory cached state for faster access between cycles.
     std::optional<std::string> m_pacmanCursor;

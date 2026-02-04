@@ -11,6 +11,7 @@
 #include "daemon/pacman_parser.hpp"
 #include "daemon/snapshot_builder.hpp"
 #include "common/json_utils.hpp"
+#include "common/khronicle_version.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -58,6 +59,13 @@ KhronicleDaemon::KhronicleDaemon(QObject *parent)
     , m_store(std::make_unique<KhronicleStore>())
     , m_journalLastTimestamp(defaultJournalStart())
 {
+    std::string integrityMessage;
+    if (!m_store->integrityCheck(&integrityMessage)) {
+        qWarning() << "Khronicle: SQLite integrity check failed — database may be corrupt:"
+                   << QString::fromStdString(integrityMessage);
+        m_ingestionEnabled = false;
+    }
+
     loadStateFromMeta();
     loadLastSnapshotFromStore();
 }
@@ -66,6 +74,8 @@ KhronicleDaemon::~KhronicleDaemon() = default;
 
 void KhronicleDaemon::start()
 {
+    qInfo() << "Khronicle: daemon starting (version" << KHRONICLE_VERSION << ")";
+
     if (!m_apiServer) {
         m_apiServer = std::make_unique<KhronicleApiServer>(*m_store);
         m_apiServer->start();
@@ -81,6 +91,10 @@ void KhronicleDaemon::start()
 
 void KhronicleDaemon::runIngestionCycle()
 {
+    if (!m_ingestionEnabled) {
+        return;
+    }
+
     const auto cycleStart = std::chrono::steady_clock::now();
 
     runPacmanIngestion();
@@ -119,7 +133,21 @@ void KhronicleDaemon::runPacmanIngestion()
         m_pacmanCursor = result.newCursor;
     }
 
+#ifndef NDEBUG
+    if (m_pacmanCursor.has_value()) {
+        try {
+            const long long value = std::stoll(*m_pacmanCursor);
+            Q_ASSERT(value >= 0);
+        } catch (const std::exception &) {
+            Q_ASSERT(false);
+        }
+    }
+#endif
+
     if (result.hadError) {
+        if (m_pacmanErrorCount == 0) {
+            qWarning() << "Khronicle: pacman ingestion failed; pacman.log may be unreadable.";
+        }
         m_pacmanErrorCount++;
         if (m_pacmanErrorCount >= kMaxConsecutiveErrors) {
             qWarning() << "Khronicle: pacman ingestion failed repeatedly, backing off.";
@@ -138,6 +166,7 @@ void KhronicleDaemon::runJournalIngestion()
         return;
     }
 
+    const auto previousTimestamp = m_journalLastTimestamp;
     const JournalParseResult result = parseJournalSince(m_journalLastTimestamp);
 
     for (const auto &event : result.events) {
@@ -148,7 +177,14 @@ void KhronicleDaemon::runJournalIngestion()
         m_journalLastTimestamp = result.lastTimestamp;
     }
 
+#ifndef NDEBUG
+    Q_ASSERT(result.lastTimestamp >= previousTimestamp);
+#endif
+
     if (result.hadError) {
+        if (m_journalErrorCount == 0) {
+            qWarning() << "Khronicle: journal ingestion failed; journalctl may be unavailable.";
+        }
         m_journalErrorCount++;
         if (m_journalErrorCount >= kMaxConsecutiveErrors) {
             qWarning() << "Khronicle: journal ingestion failed repeatedly, backing off.";
@@ -169,6 +205,10 @@ void KhronicleDaemon::runSnapshotCheck()
         m_lastSnapshot = current;
         return;
     }
+
+#ifndef NDEBUG
+    Q_ASSERT(current.timestamp >= m_lastSnapshot->timestamp);
+#endif
 
     if (m_lastSnapshot->kernelVersion == current.kernelVersion) {
         return;
@@ -227,12 +267,15 @@ void KhronicleDaemon::loadStateFromMeta()
 
 void KhronicleDaemon::persistStateToMeta()
 {
-    if (m_pacmanCursor.has_value()) {
-        m_store->setMeta("pacman_last_cursor", *m_pacmanCursor);
+    try {
+        if (m_pacmanCursor.has_value()) {
+            m_store->setMeta("pacman_last_cursor", *m_pacmanCursor);
+        }
+        m_store->setMeta("journal_last_timestamp",
+                         timePointToIso(m_journalLastTimestamp));
+    } catch (const std::exception &ex) {
+        qWarning() << "Khronicle: failed to persist meta state:" << ex.what();
     }
-
-    m_store->setMeta("journal_last_timestamp",
-                     timePointToIso(m_journalLastTimestamp));
 }
 
 void KhronicleDaemon::loadLastSnapshotFromStore()

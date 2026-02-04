@@ -70,3 +70,20 @@ khronicle-report timeline --from "2026-01-28T00:00:00Z" --to "2026-01-29T00:00:0
 # Snapshot diff as JSON
 khronicle-report diff --snapshot-a "snapshot-123" --snapshot-b "snapshot-456" --format json > diff.json
 ```
+
+## Stability & Guarantees
+
+Khronicle is designed to be safe and predictable:
+
+What Khronicle guarantees:
+Append-only event history (no destructive auto-cleanup)
+Snapshot diff correctness for stored snapshots
+
+What Khronicle does not guarantee:
+Perfect reconstruction of every system change
+Root-level auditing or tamper-proof logs
+
+Debugging tips:
+Check daemon logs for warnings
+Use `khronicle-report` for exports
+Query `get_daemon_status` via the local JSON-RPC socket for diagnostics

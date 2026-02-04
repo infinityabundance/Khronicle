@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <iostream>
 #include <set>
 #include <stdexcept>
 
@@ -205,6 +206,20 @@ KhronicleStore::~KhronicleStore()
 
 void KhronicleStore::addEvent(const KhronicleEvent &event)
 {
+    Statement dedupeStmt(impl->db,
+                         "SELECT 1 FROM events WHERE timestamp = ? AND category = ? "
+                         "AND summary = ? LIMIT 1;");
+    sqlite3_bind_int64(dedupeStmt.get(), 1, toEpochSeconds(event.timestamp));
+    sqlite3_bind_int(dedupeStmt.get(), 2, static_cast<int>(event.category));
+    bindText(dedupeStmt.get(), 3, event.summary);
+
+    if (sqlite3_step(dedupeStmt.get()) == SQLITE_ROW) {
+#ifndef NDEBUG
+        std::cerr << "Khronicle: duplicate event suppressed.\n";
+#endif
+        return;
+    }
+
     Statement stmt(impl->db,
                    "INSERT OR REPLACE INTO events (id, timestamp, category, "
                    "source, summary, details, before_state, after_state, "
@@ -445,6 +460,24 @@ void KhronicleStore::setMeta(const std::string &key, const std::string &value)
     if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
         throw std::runtime_error("failed to set meta value");
     }
+}
+
+bool KhronicleStore::integrityCheck(std::string *message) const
+{
+    Statement stmt(impl->db, "PRAGMA integrity_check;");
+
+    if (sqlite3_step(stmt.get()) != SQLITE_ROW) {
+        if (message) {
+            *message = "integrity_check failed to return a result";
+        }
+        return false;
+    }
+
+    const std::string result = columnText(stmt.get(), 0);
+    if (message) {
+        *message = result;
+    }
+    return result == "ok";
 }
 
 } // namespace khronicle
