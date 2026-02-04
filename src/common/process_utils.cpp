@@ -1,6 +1,8 @@
 #include "common/process_utils.hpp"
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QFileInfo>
 #include <QLocalSocket>
 #include <QProcess>
 #include <QStandardPaths>
@@ -11,6 +13,20 @@
 #include <nlohmann/json.hpp>
 
 namespace khronicle {
+
+namespace {
+
+QString findSiblingBinary(const QString &name)
+{
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QString siblingPath = appDir + QDir::separator() + name;
+    if (QFileInfo::exists(siblingPath)) {
+        return siblingPath;
+    }
+    return QString();
+}
+
+} // namespace
 
 QString daemonSocketPath()
 {
@@ -43,6 +59,15 @@ bool startDaemon()
               QString(),
               nlohmann::json::object());
 
+    // Try sibling binary first (for dev builds)
+    const QString siblingDaemon = findSiblingBinary(QStringLiteral("khronicle-daemon"));
+    if (!siblingDaemon.isEmpty()) {
+        if (QProcess::startDetached(siblingDaemon, {})) {
+            return true;
+        }
+    }
+
+    // Try systemctl (for installed systems)
     const QString systemctl = QStringLiteral("systemctl");
     QStringList args = {QStringLiteral("--user"), QStringLiteral("start"),
                         QStringLiteral("khronicle-daemon.service")};
@@ -50,7 +75,8 @@ bool startDaemon()
         return true;
     }
 
-    return QProcess::startDetached(QStringLiteral("khronicle-daemon"));
+    // Fall back to PATH lookup
+    return QProcess::startDetached(QStringLiteral("khronicle-daemon"), {});
 }
 
 bool stopDaemon()
@@ -96,7 +122,17 @@ bool startTray()
               khronicle::logging::defaultWho(),
               QString(),
               nlohmann::json::object());
-    return QProcess::startDetached(QStringLiteral("khronicle-tray"));
+
+    // Try sibling binary first (for dev builds)
+    const QString siblingTray = findSiblingBinary(QStringLiteral("khronicle-tray"));
+    if (!siblingTray.isEmpty()) {
+        if (QProcess::startDetached(siblingTray, {})) {
+            return true;
+        }
+    }
+
+    // Fall back to PATH lookup
+    return QProcess::startDetached(QStringLiteral("khronicle-tray"), {});
 }
 
 } // namespace khronicle
