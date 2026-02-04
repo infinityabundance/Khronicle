@@ -105,6 +105,27 @@ target_link_libraries(test_fleet_model
 
 add_test(NAME test_fleet_model COMMAND test_fleet_model)
 
+add_executable(test_watch_engine
+    test_watch_engine.cpp
+    ../src/daemon/watch_engine.cpp
+)
+
+target_include_directories(test_watch_engine
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src/common
+)
+
+target_link_libraries(test_watch_engine
+    PRIVATE
+        Qt6::Core
+        Qt6::Test
+        nlohmann_json::nlohmann_json
+        SQLite::SQLite3
+)
+
+add_test(NAME test_watch_engine COMMAND test_watch_engine)
+
 add_executable(test_host_identity
     test_host_identity.cpp
 )

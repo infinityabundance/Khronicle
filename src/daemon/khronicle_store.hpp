@@ -19,6 +19,14 @@ public:
     void addSnapshot(const SystemSnapshot &snapshot);
     HostIdentity getHostIdentity() const;
 
+    std::vector<WatchRule> listWatchRules() const;
+    void upsertWatchRule(const WatchRule &rule);
+    void deleteWatchRule(const std::string &id);
+
+    void addWatchSignal(const WatchSignal &signal);
+    std::vector<WatchSignal> getWatchSignalsSince(
+        std::chrono::system_clock::time_point t) const;
+
     std::vector<KhronicleEvent> getEventsSince(
         std::chrono::system_clock::time_point since) const;
     std::vector<KhronicleEvent> getEventsBetween(

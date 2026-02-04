@@ -290,6 +290,62 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
 
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
+        } else if (method == "list_watch_rules") {
+            const auto rules = m_store.listWatchRules();
+            nlohmann::json result;
+            result["rules"] = rules;
+            const QByteArray response = makeResultResponse(result, id);
+            socket->write(response);
+        } else if (method == "upsert_watch_rule") {
+            if (!params.contains("rule") || !params["rule"].is_object()) {
+                const QByteArray response = makeErrorResponse("Missing rule object", id);
+                socket->write(response);
+                socket->flush();
+                socket->disconnectFromServer();
+                return;
+            }
+            WatchRule rule = params["rule"].get<WatchRule>();
+            if (rule.id.empty()) {
+                const QByteArray response = makeErrorResponse("Missing rule id", id);
+                socket->write(response);
+                socket->flush();
+                socket->disconnectFromServer();
+                return;
+            }
+            m_store.upsertWatchRule(rule);
+            nlohmann::json result;
+            result["ok"] = true;
+            const QByteArray response = makeResultResponse(result, id);
+            socket->write(response);
+        } else if (method == "delete_watch_rule") {
+            const std::string ruleId = params.value("id", "");
+            if (ruleId.empty()) {
+                const QByteArray response = makeErrorResponse("Missing rule id", id);
+                socket->write(response);
+                socket->flush();
+                socket->disconnectFromServer();
+                return;
+            }
+            m_store.deleteWatchRule(ruleId);
+            nlohmann::json result;
+            result["ok"] = true;
+            const QByteArray response = makeResultResponse(result, id);
+            socket->write(response);
+        } else if (method == "get_watch_signals_since") {
+            const std::string sinceValue = params.value("since", "");
+            const auto since = fromIso8601Utc(sinceValue);
+            if (since == std::chrono::system_clock::time_point{}) {
+                const QByteArray response = makeErrorResponse("Invalid since timestamp", id);
+                socket->write(response);
+                socket->flush();
+                socket->disconnectFromServer();
+                return;
+            }
+            const auto signals = m_store.getWatchSignalsSince(since);
+            nlohmann::json result;
+            result["signals"] = signals;
+            const QByteArray response = makeResultResponse(result, id);
+            socket->write(response);
         } else if (method == "explain_change_between") {
             const std::string fromValue = params.value("from", "");
             const std::string toValue = params.value("to", "");

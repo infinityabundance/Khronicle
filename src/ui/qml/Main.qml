@@ -141,7 +141,23 @@ Kirigami.ApplicationWindow {
         }
     }
 
-    pageStack.initialPage: Kirigami.Page {
+    globalDrawer: Kirigami.GlobalDrawer {
+        title: "Khronicle"
+        actions: [
+            Kirigami.Action {
+                text: "Overview"
+                onTriggered: root.pageStack.replace(overviewPageComponent)
+            },
+            Kirigami.Action {
+                text: "Watchpoints"
+                onTriggered: root.pageStack.replace(watchpointsPageComponent)
+            }
+        ]
+    }
+
+    Component {
+        id: overviewPageComponent
+        Kirigami.Page {
         title: "Khronicle"
 
         ColumnLayout {
@@ -283,4 +299,11 @@ Kirigami.ApplicationWindow {
             }
         }
     }
+
+    Component {
+        id: watchpointsPageComponent
+        WatchpointsPage { }
+    }
+
+    pageStack.initialPage: overviewPageComponent
 }
