@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <QString>
+#include <QStringList>
 
 #include "models.hpp"
 
@@ -22,5 +23,10 @@ struct JournalParseResult {
  * parse its output (short ISO format).
  */
 JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since);
+
+// Parse pre-fetched journalctl output lines (short-iso format). This is used for tests
+// and for isolating parsing logic from the system journal invocation.
+JournalParseResult parseJournalOutputLines(const QStringList &lines,
+                                           std::chrono::system_clock::time_point since);
 
 } // namespace khronicle

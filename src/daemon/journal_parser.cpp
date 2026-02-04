@@ -123,9 +123,6 @@ bool messageHasGpuSignal(const QString &message)
 JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since)
 {
     // Query journalctl incrementally, returning only events newer than "since".
-    JournalParseResult result;
-    result.lastTimestamp = since;
-
     QProcess process;
     QString sinceArg = QStringLiteral("--since=%1").arg(toIsoSince(since));
     process.start(QStringLiteral("journalctl"),
@@ -133,6 +130,8 @@ JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since
 
     if (!process.waitForStarted()) {
         // If journalctl cannot start, return empty events and keep lastTimestamp unchanged.
+        JournalParseResult result;
+        result.lastTimestamp = since;
         return result;
     }
 
@@ -140,15 +139,27 @@ JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since
 
     if (!process.waitForFinished()) {
         // If journalctl fails, return empty events and keep lastTimestamp unchanged.
+        JournalParseResult result;
+        result.lastTimestamp = since;
         return result;
     }
 
     if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+        JournalParseResult result;
+        result.lastTimestamp = since;
         return result;
     }
 
     const QString output = QString::fromUtf8(process.readAllStandardOutput());
     const QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+    return parseJournalOutputLines(lines, since);
+}
+
+JournalParseResult parseJournalOutputLines(const QStringList &lines,
+                                           std::chrono::system_clock::time_point since)
+{
+    JournalParseResult result;
+    result.lastTimestamp = since;
 
     for (const QString &line : lines) {
         int space = line.indexOf(' ');
