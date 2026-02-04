@@ -80,7 +80,7 @@ Kirigami.Card {
             ColumnLayout {
                 Layout.fillWidth: true
 
-                Kirigami.Label {
+                Label {
                     text: "Compare from"
                     opacity: 0.7
                 }
@@ -102,7 +102,7 @@ Kirigami.Card {
             ColumnLayout {
                 Layout.fillWidth: true
 
-                Kirigami.Label {
+                Label {
                     text: "Compare to"
                     opacity: 0.7
                 }

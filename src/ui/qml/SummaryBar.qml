@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
@@ -23,14 +24,14 @@ Item {
                 text: "Summary"
             }
 
-            Kirigami.Label {
+            Label {
                 visible: root.rangeLabel && root.rangeLabel.length > 0
                 text: "Range: " + root.rangeLabel
                 opacity: 0.7
                 font.pointSize: Kirigami.Theme.defaultFont.pointSize * 0.9
             }
 
-            Kirigami.Label {
+            Label {
                 visible: Object.keys(root.summary).length === 0
                 text: "No changes recorded yet."
                 opacity: 0.6
@@ -40,21 +41,21 @@ Item {
                 visible: Object.keys(root.summary).length !== 0
                 spacing: Kirigami.Units.smallSpacing
 
-                Kirigami.Label {
+                Label {
                     text: root.summary.kernelChanged ?
                           ("Kernel: " + (root.summary.kernelFrom || "?") + " → " + (root.summary.kernelTo || "?")) :
                           "Kernel: no change"
                 }
 
-                Kirigami.Label {
+                Label {
                     text: "GPU events: " + (root.summary.gpuEvents || 0)
                 }
 
-                Kirigami.Label {
+                Label {
                     text: "Firmware updates: " + (root.summary.firmwareEvents || 0)
                 }
 
-                Kirigami.Label {
+                Label {
                     text: "Total changes: " + (root.summary.totalEvents || 0)
                 }
             }

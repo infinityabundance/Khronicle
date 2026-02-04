@@ -125,16 +125,16 @@ Kirigami.ApplicationWindow {
                                 spacing: Kirigami.Units.smallSpacing
                                 width: parent.width
 
-                                Kirigami.Label {
+                                Label {
                                     text: modelData.timeBucket
                                     Layout.preferredWidth: 180
                                 }
 
-                                Kirigami.Label {
+                                Label {
                                     text: "Host A: " + modelData.hostAEvents.length
                                 }
 
-                                Kirigami.Label {
+                                Label {
                                     text: "Host B: " + modelData.hostBEvents.length
                                 }
                             }

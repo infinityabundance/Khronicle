@@ -183,7 +183,7 @@ Kirigami.ApplicationWindow {
                 Layout.fillWidth: true
                 spacing: Kirigami.Units.smallSpacing
 
-                Kirigami.Label {
+                Label {
                     text: daemonController && daemonController.daemonRunning
                         ? "Daemon: Running"
                         : "Daemon: Stopped"
@@ -337,7 +337,7 @@ Kirigami.ApplicationWindow {
                     }
                 }
 
-                Kirigami.Label {
+                Label {
                     Layout.fillWidth: true
                     wrapMode: Text.Wrap
                     text: root.explanationText
@@ -366,7 +366,7 @@ Kirigami.ApplicationWindow {
         contentItem: ColumnLayout {
             spacing: Kirigami.Units.smallSpacing
             Kirigami.Heading { text: "Khronicle" }
-            Kirigami.Label {
+            Label {
                 text: "System change chronicle for CachyOS/Arch-like systems."
                 wrapMode: Text.Wrap
             }

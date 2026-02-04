@@ -45,19 +45,19 @@ Kirigami.Card {
                 spacing: Kirigami.Units.largeSpacing
                 Layout.fillWidth: true
 
-                Kirigami.Label {
+                Label {
                     text: "Change"
                     opacity: 0.7
                     Layout.preferredWidth: parent.width * 0.3
                 }
 
-                Kirigami.Label {
+                Label {
                     text: "Before"
                     opacity: 0.7
                     Layout.preferredWidth: parent.width * 0.35
                 }
 
-                Kirigami.Label {
+                Label {
                     text: "After"
                     opacity: 0.7
                     Layout.preferredWidth: parent.width * 0.35
@@ -67,28 +67,27 @@ Kirigami.Card {
             Repeater {
                 model: root.diffRows
 
-                delegate: Kirigami.AbstractListItem {
+                delegate: ItemDelegate {
                     width: parent.width
-                    checkable: false
 
                     contentItem: RowLayout {
                         spacing: Kirigami.Units.largeSpacing
                         anchors.margins: Kirigami.Units.smallSpacing
 
-                        Kirigami.Label {
+                        Label {
                             text: humanizePath(modelData.path)
                             font.bold: true
                             Layout.preferredWidth: parent.width * 0.3
                             wrapMode: Text.Wrap
                         }
 
-                        Kirigami.Label {
+                        Label {
                             text: modelData.before || ""
                             Layout.preferredWidth: parent.width * 0.35
                             wrapMode: Text.Wrap
                         }
 
-                        Kirigami.Label {
+                        Label {
                             text: modelData.after || ""
                             Layout.preferredWidth: parent.width * 0.35
                             wrapMode: Text.Wrap

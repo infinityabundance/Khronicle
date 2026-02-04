@@ -1,11 +1,11 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
-Kirigami.AbstractListItem {
+ItemDelegate {
     id: root
     property var eventData: ({})
-    checkable: false
 
     function timePart(iso) {
         if (!iso) {
@@ -47,7 +47,7 @@ Kirigami.AbstractListItem {
         RowLayout {
             spacing: Kirigami.Units.smallSpacing
 
-            Kirigami.Label {
+            Label {
                 text: timePart(root.eventData.timestamp)
                 opacity: 0.7
                 Layout.alignment: Qt.AlignTop
@@ -61,19 +61,19 @@ Kirigami.AbstractListItem {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
 
-                    Kirigami.Label {
+                    Label {
                         text: root.eventData.summary || ""
                         Layout.fillWidth: true
                         wrapMode: Text.Wrap
                     }
 
-                    Kirigami.Label {
+                    Label {
                         text: categoryLabel(root.eventData.category || "")
                         opacity: 0.7
                     }
                 }
 
-                Kirigami.Label {
+                Label {
                     visible: (root.eventData.details || "").length > 0
                     text: root.eventData.details || ""
                     wrapMode: Text.Wrap
