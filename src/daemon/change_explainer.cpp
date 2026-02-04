@@ -2,6 +2,10 @@
 
 #include <sstream>
 
+#include <nlohmann/json.hpp>
+
+#include "common/logging.hpp"
+
 namespace khronicle {
 
 std::string explainChange(const KhronicleDiff &diff,
@@ -9,6 +13,15 @@ std::string explainChange(const KhronicleDiff &diff,
 {
     // INVARIANT: No silent inference.
     // Explanations are interpretive summaries derived from recorded facts.
+    KLOG_DEBUG(QStringLiteral("ChangeExplainer"),
+               QStringLiteral("explainChange"),
+               QStringLiteral("explain_change_start"),
+               QStringLiteral("interpretation_request"),
+               QStringLiteral("summary"),
+               khronicle::logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"eventCount", events.size()},
+                              {"changedFields", diff.changedFields.size()}});
     bool kernelChange = false;
     bool gpuChange = false;
     bool firmwareChange = false;
@@ -61,6 +74,14 @@ std::string explainChange(const KhronicleDiff &diff,
     }
 
     if (highlights.empty()) {
+        KLOG_INFO(QStringLiteral("ChangeExplainer"),
+                  QStringLiteral("explainChange"),
+                  QStringLiteral("explain_change_complete"),
+                  QStringLiteral("interpretation_request"),
+                  QStringLiteral("summary"),
+                  khronicle::logging::defaultWho(),
+                  QString(),
+                  nlohmann::json{{"highlights", 0}});
         return "No significant kernel, GPU, or firmware changes were detected during this interval.";
     }
 
@@ -75,6 +96,14 @@ std::string explainChange(const KhronicleDiff &diff,
         summary << highlights[i];
     }
     summary << ". These changes may explain differences in system behavior.";
+    KLOG_INFO(QStringLiteral("ChangeExplainer"),
+              QStringLiteral("explainChange"),
+              QStringLiteral("explain_change_complete"),
+              QStringLiteral("interpretation_request"),
+              QStringLiteral("summary"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"highlights", highlights.size()}});
     return summary.str();
 }
 

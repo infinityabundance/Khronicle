@@ -9,6 +9,8 @@
 #include "ui/backend/KhronicleApiClient.hpp"
 #include "ui/backend/FleetModel.hpp"
 #include "ui/backend/WatchClient.hpp"
+#include "common/logging.hpp"
+#include <nlohmann/json.hpp>
 
 int main(int argc, char *argv[])
 {
@@ -19,9 +21,12 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     QCommandLineParser parser;
     parser.addHelpOption();
+    QCommandLineOption codexOption(QStringList() << "codex-trace",
+                                   "Enable verbose Codex trace logging.");
     QCommandLineOption fleetOption(QStringList() << "fleet",
                                    "Open in fleet mode with aggregate JSON file.",
                                    "path");
+    parser.addOption(codexOption);
     parser.addOption(fleetOption);
     parser.process(app);
 
@@ -29,6 +34,19 @@ int main(int argc, char *argv[])
     std::unique_ptr<khronicle::FleetModel> fleetModel;
     std::unique_ptr<khronicle::KhronicleApiClient> apiClient;
     std::unique_ptr<khronicle::WatchClient> watchClient;
+
+    const bool codexTrace = parser.isSet(codexOption)
+        || qEnvironmentVariableIntValue("KHRONICLE_CODEX_TRACE") == 1;
+    khronicle::logging::initLogging(QStringLiteral("khronicle"), codexTrace);
+
+    KLOG_INFO(QStringLiteral("main"),
+              QStringLiteral("main"),
+              QStringLiteral("ui_start"),
+              QStringLiteral("user_start"),
+              QStringLiteral("qt_app"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"fleetMode", parser.isSet(fleetOption)}});
 
     if (parser.isSet(fleetOption)) {
         // Fleet mode is offline and read-only: it loads aggregate JSON directly.

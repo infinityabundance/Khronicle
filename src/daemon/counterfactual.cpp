@@ -2,7 +2,10 @@
 
 #include <set>
 
+#include <nlohmann/json.hpp>
+
 #include "daemon/change_explainer.hpp"
+#include "common/logging.hpp"
 
 namespace khronicle {
 
@@ -13,6 +16,16 @@ CounterfactualResult computeCounterfactual(
 {
     // INVARIANT: Facts precede interpretation.
     // Counterfactual output is derived from stored snapshots/events.
+    KLOG_DEBUG(QStringLiteral("Counterfactual"),
+               QStringLiteral("computeCounterfactual"),
+               QStringLiteral("explain_change_start"),
+               QStringLiteral("interpretation_request"),
+               QStringLiteral("snapshot_diff"),
+               khronicle::logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"baselineId", baseline.id},
+                              {"comparisonId", comparison.id},
+                              {"eventCount", interveningEvents.size()}});
     CounterfactualResult result;
     result.baselineSnapshotId = baseline.id;
     result.comparisonSnapshotId = comparison.id;
@@ -78,6 +91,14 @@ CounterfactualResult computeCounterfactual(
 
     result.diff = diff;
     result.explanationSummary = explainChange(diff, interveningEvents);
+    KLOG_INFO(QStringLiteral("Counterfactual"),
+              QStringLiteral("computeCounterfactual"),
+              QStringLiteral("explain_change_complete"),
+              QStringLiteral("interpretation_request"),
+              QStringLiteral("snapshot_diff"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"changedFields", diff.changedFields.size()}});
     return result;
 }
 

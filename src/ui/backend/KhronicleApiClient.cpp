@@ -5,7 +5,11 @@
 #include <QJsonObject>
 #include <QJsonValue>
 
+#include <nlohmann/json.hpp>
+
 #include <unistd.h>
+
+#include "common/logging.hpp"
 
 namespace khronicle {
 
@@ -43,6 +47,14 @@ void KhronicleApiClient::connectToDaemon()
         return;
     }
 
+    KLOG_INFO(QStringLiteral("KhronicleApiClient"),
+              QStringLiteral("connectToDaemon"),
+              QStringLiteral("connect_daemon"),
+              QStringLiteral("ui_start"),
+              QStringLiteral("local_socket"),
+              logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"socketPath", socketPath().toStdString()}});
     m_socket->connectToServer(socketPath());
 }
 
@@ -134,6 +146,14 @@ void KhronicleApiClient::sendRequest(const QString &method,
     if (m_socket->state() != QLocalSocket::ConnectedState) {
         connectToDaemon();
         emit errorOccurred(QStringLiteral("Not connected to Khronicle daemon"));
+        KLOG_WARN(QStringLiteral("KhronicleApiClient"),
+                  QStringLiteral("sendRequest"),
+                  QStringLiteral("request_failed"),
+                  QStringLiteral("socket_disconnected"),
+                  QStringLiteral("local_socket"),
+                  logging::defaultWho(),
+                  QString(),
+                  nlohmann::json{{"method", method.toStdString()}});
         return;
     }
 
@@ -150,6 +170,16 @@ void KhronicleApiClient::sendRequest(const QString &method,
     m_socket->flush();
 
     m_pending.insert(id, PendingRequest{method});
+
+    KLOG_DEBUG(QStringLiteral("KhronicleApiClient"),
+               QStringLiteral("sendRequest"),
+               QStringLiteral("api_request_sent"),
+               QStringLiteral("ui_action"),
+               QStringLiteral("json_rpc"),
+               logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"method", method.toStdString()},
+                              {"id", id}});
 }
 
 void KhronicleApiClient::handleResponse(const QJsonObject &obj)
@@ -164,6 +194,15 @@ void KhronicleApiClient::handleResponse(const QJsonObject &obj)
 
     if (obj.contains("error")) {
         emit errorOccurred(obj.value("error").toString());
+        KLOG_WARN(QStringLiteral("KhronicleApiClient"),
+                  QStringLiteral("handleResponse"),
+                  QStringLiteral("api_request_error"),
+                  QStringLiteral("daemon_error"),
+                  QStringLiteral("json_rpc"),
+                  logging::defaultWho(),
+                  QString(),
+                  nlohmann::json{{"method", pending.method.toStdString()},
+                                 {"id", id}});
         return;
     }
 
@@ -174,6 +213,16 @@ void KhronicleApiClient::handleResponse(const QJsonObject &obj)
     }
 
     const QJsonObject result = resultValue.toObject();
+
+    KLOG_DEBUG(QStringLiteral("KhronicleApiClient"),
+               QStringLiteral("handleResponse"),
+               QStringLiteral("api_request_completed"),
+               QStringLiteral("daemon_response"),
+               QStringLiteral("json_rpc"),
+               logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"method", pending.method.toStdString()},
+                              {"id", id}});
 
     if (pending.method == "get_changes_since" || pending.method == "get_changes_between") {
         emit changesLoaded(convertEventsJsonToVariantList(result.value("events")));

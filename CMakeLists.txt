@@ -21,6 +21,7 @@ add_executable(khronicle-daemon
     src/daemon/counterfactual.cpp
     src/daemon/khronicle_daemon.cpp
     src/daemon/watch_engine.cpp
+    src/common/logging.cpp
 )
 
 target_include_directories(khronicle-daemon
@@ -41,6 +42,7 @@ add_executable(khronicle
     src/ui/backend/KhronicleApiClient.cpp
     src/ui/backend/FleetModel.cpp
     src/ui/backend/WatchClient.cpp
+    src/common/logging.cpp
 )
 
 target_include_directories(khronicle
@@ -68,6 +70,7 @@ target_link_libraries(khronicle
 add_executable(khronicle-tray
     src/tray/main.cpp
     src/tray/KhronicleTray.cpp
+    src/common/logging.cpp
 )
 
 target_include_directories(khronicle-tray
@@ -91,6 +94,7 @@ add_executable(khronicle-report
     src/report/ReportCli.cpp
     src/daemon/change_explainer.cpp
     src/daemon/counterfactual.cpp
+    src/common/logging.cpp
 )
 
 target_include_directories(khronicle-report

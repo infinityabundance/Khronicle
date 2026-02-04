@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include "common/json_utils.hpp"
+#include "common/logging.hpp"
 
 namespace khronicle {
 
@@ -136,6 +137,15 @@ void WatchEngine::evaluateEvent(const KhronicleEvent &event)
 {
     // Evaluate all enabled event-scope rules against this event and persist
     // WatchSignal records for any matches.
+    KLOG_DEBUG(QStringLiteral("WatchEngine"),
+               QStringLiteral("evaluateEvent"),
+               QStringLiteral("evaluate_watch_rules"),
+               QStringLiteral("ingestion_event_interpretation"),
+               QStringLiteral("rule_match"),
+               khronicle::logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"eventId", event.id},
+                              {"rulesCached", m_rulesCache.size()}});
     maybeReloadRules();
 
     for (const auto &rule : m_rulesCache) {
@@ -160,6 +170,16 @@ void WatchEngine::evaluateEvent(const KhronicleEvent &event)
             signal.message += " category '" + rule.categoryEquals + "'";
         }
 
+        KLOG_INFO(QStringLiteral("WatchEngine"),
+                  QStringLiteral("evaluateEvent"),
+                  QStringLiteral("watch_signal_fired"),
+                  QStringLiteral("rule_match"),
+                  QStringLiteral("persist_signal"),
+                  khronicle::logging::defaultWho(),
+                  QString(),
+                  nlohmann::json{{"ruleId", rule.id},
+                                 {"originId", event.id},
+                                 {"severity", toWatchSeverityString(rule.severity)}});
         m_store.addWatchSignal(signal);
     }
 }
@@ -167,6 +187,15 @@ void WatchEngine::evaluateEvent(const KhronicleEvent &event)
 void WatchEngine::evaluateSnapshot(const SystemSnapshot &snapshot)
 {
     // Evaluate all enabled snapshot-scope rules against this snapshot.
+    KLOG_DEBUG(QStringLiteral("WatchEngine"),
+               QStringLiteral("evaluateSnapshot"),
+               QStringLiteral("evaluate_watch_rules"),
+               QStringLiteral("snapshot_interpretation"),
+               QStringLiteral("rule_match"),
+               khronicle::logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"snapshotId", snapshot.id},
+                              {"rulesCached", m_rulesCache.size()}});
     maybeReloadRules();
 
     for (const auto &rule : m_rulesCache) {
@@ -191,6 +220,16 @@ void WatchEngine::evaluateSnapshot(const SystemSnapshot &snapshot)
             signal.message += " category '" + rule.categoryEquals + "'";
         }
 
+        KLOG_INFO(QStringLiteral("WatchEngine"),
+                  QStringLiteral("evaluateSnapshot"),
+                  QStringLiteral("watch_signal_fired"),
+                  QStringLiteral("rule_match"),
+                  QStringLiteral("persist_signal"),
+                  khronicle::logging::defaultWho(),
+                  QString(),
+                  nlohmann::json{{"ruleId", rule.id},
+                                 {"originId", snapshot.id},
+                                 {"severity", toWatchSeverityString(rule.severity)}});
         m_store.addWatchSignal(signal);
     }
 }
@@ -206,6 +245,14 @@ void WatchEngine::maybeReloadRules()
 
     m_rulesCache = m_store.listWatchRules();
     m_lastRulesReload = now;
+    KLOG_DEBUG(QStringLiteral("WatchEngine"),
+               QStringLiteral("maybeReloadRules"),
+               QStringLiteral("rules_cache_reload"),
+               QStringLiteral("periodic_refresh"),
+               QStringLiteral("sqlite_query"),
+               khronicle::logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"ruleCount", m_rulesCache.size()}});
 }
 
 bool WatchEngine::ruleMatchesEvent(const WatchRule &rule,

@@ -12,6 +12,7 @@
 
 #include "common/json_utils.hpp"
 #include "common/models.hpp"
+#include "common/logging.hpp"
 #include "daemon/khronicle_store.hpp"
 #include "daemon/counterfactual.hpp"
 
@@ -217,6 +218,14 @@ int ReportCli::run(int argc, char *argv[])
     }
 
     const QString command = args.at(1);
+    KLOG_INFO(QStringLiteral("ReportCli"),
+              QStringLiteral("run"),
+              QStringLiteral("report_cli_command"),
+              QStringLiteral("user_invocation"),
+              QStringLiteral("cli"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"command", command.toStdString()}});
     if (command == QStringLiteral("timeline")) {
         return runTimelineReport(args);
     }
@@ -264,6 +273,15 @@ int ReportCli::runTimelineReport(const QStringList &args)
     KhronicleStore store;
     const auto events = store.getEventsBetween(*from, *to);
 
+    KLOG_INFO(QStringLiteral("ReportCli"),
+              QStringLiteral("runTimelineReport"),
+              QStringLiteral("report_timeline"),
+              QStringLiteral("user_invocation"),
+              QStringLiteral("sqlite_query"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"events", events.size()},
+                             {"format", format.toStdString()}});
     if (format == QStringLiteral("json")) {
         renderTimelineJson(events, *from, *to);
     } else {
@@ -302,6 +320,16 @@ int ReportCli::runDiffReport(const QStringList &args)
     const KhronicleDiff diff =
         store.diffSnapshots(snapshotAId.toStdString(), snapshotBId.toStdString());
 
+    KLOG_INFO(QStringLiteral("ReportCli"),
+              QStringLiteral("runDiffReport"),
+              QStringLiteral("report_diff"),
+              QStringLiteral("user_invocation"),
+              QStringLiteral("sqlite_query"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"snapshotA", snapshotAId.toStdString()},
+                             {"snapshotB", snapshotBId.toStdString()},
+                             {"format", format.toStdString()}});
     if (format == QStringLiteral("json")) {
         renderDiffJson(diff, &*snapshotA, &*snapshotB);
     } else {
@@ -347,6 +375,15 @@ int ReportCli::runExplainReport(const QStringList &args)
     const auto events = store.getEventsBetween(*from, *to);
     const auto result = computeCounterfactual(*baseline, *comparison, events);
 
+    KLOG_INFO(QStringLiteral("ReportCli"),
+              QStringLiteral("runExplainReport"),
+              QStringLiteral("report_explain"),
+              QStringLiteral("user_invocation"),
+              QStringLiteral("sqlite_query"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"events", events.size()},
+                             {"format", format.toStdString()}});
     if (format == QStringLiteral("json")) {
         nlohmann::json payload;
         payload["baselineSnapshot"] = result.baselineSnapshotId;
@@ -448,6 +485,16 @@ int ReportCli::runBundleReport(const QStringList &args)
             std::cerr << "tar failed to create bundle." << std::endl;
             return 1;
         }
+        KLOG_INFO(QStringLiteral("ReportCli"),
+                  QStringLiteral("runBundleReport"),
+                  QStringLiteral("report_bundle"),
+                  QStringLiteral("user_invocation"),
+                  QStringLiteral("bundle_export"),
+                  khronicle::logging::defaultWho(),
+                  QString(),
+                  nlohmann::json{{"events", events.size()},
+                                 {"snapshots", filteredSnapshots.size()},
+                                 {"out", outPath.toStdString()}});
     } catch (const std::exception &ex) {
         std::cerr << "Failed to open database: " << ex.what() << std::endl;
         return 1;
@@ -543,6 +590,15 @@ int ReportCli::runAggregateReport(const QStringList &args)
             std::cerr << "Failed to write aggregate JSON." << std::endl;
             return 1;
         }
+        KLOG_INFO(QStringLiteral("ReportCli"),
+                  QStringLiteral("runAggregateReport"),
+                  QStringLiteral("report_aggregate"),
+                  QStringLiteral("user_invocation"),
+                  QStringLiteral("bundle_aggregate"),
+                  khronicle::logging::defaultWho(),
+                  QString(),
+                  nlohmann::json{{"hosts", aggregate["hosts"].size()},
+                                 {"out", outPath.toStdString()}});
         return 0;
     }
 
@@ -629,6 +685,15 @@ int ReportCli::runAggregateReport(const QStringList &args)
     }
 
     outFile.write(output);
+    KLOG_INFO(QStringLiteral("ReportCli"),
+              QStringLiteral("runAggregateReport"),
+              QStringLiteral("report_aggregate"),
+              QStringLiteral("user_invocation"),
+              QStringLiteral("bundle_aggregate"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json{{"hosts", aggregate["hosts"].size()},
+                             {"out", outPath.toStdString()}});
     return 0;
 }
 

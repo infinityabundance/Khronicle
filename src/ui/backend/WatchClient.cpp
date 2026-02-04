@@ -8,6 +8,10 @@
 
 #include <unistd.h>
 
+#include <nlohmann/json.hpp>
+
+#include "common/logging.hpp"
+
 namespace khronicle {
 
 namespace {
@@ -93,6 +97,14 @@ void WatchClient::sendRequest(const QString &method, const QJsonObject &params)
     if (m_socket->state() != QLocalSocket::ConnectedState) {
         connectToDaemon();
         emit errorOccurred(QStringLiteral("Not connected to Khronicle daemon"));
+        KLOG_WARN(QStringLiteral("WatchClient"),
+                  QStringLiteral("sendRequest"),
+                  QStringLiteral("request_failed"),
+                  QStringLiteral("socket_disconnected"),
+                  QStringLiteral("local_socket"),
+                  logging::defaultWho(),
+                  QString(),
+                  nlohmann::json{{"method", method.toStdString()}});
         return;
     }
 
@@ -109,6 +121,16 @@ void WatchClient::sendRequest(const QString &method, const QJsonObject &params)
     m_socket->flush();
 
     m_pending.insert(id, PendingRequest{method});
+
+    KLOG_DEBUG(QStringLiteral("WatchClient"),
+               QStringLiteral("sendRequest"),
+               QStringLiteral("api_request_sent"),
+               QStringLiteral("ui_action"),
+               QStringLiteral("json_rpc"),
+               logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"method", method.toStdString()},
+                              {"id", id}});
 }
 
 void WatchClient::handleResponse(const QJsonObject &obj)
@@ -122,6 +144,15 @@ void WatchClient::handleResponse(const QJsonObject &obj)
     const PendingRequest pending = m_pending.take(id);
     if (obj.contains("error")) {
         emit errorOccurred(obj.value("error").toString());
+        KLOG_WARN(QStringLiteral("WatchClient"),
+                  QStringLiteral("handleResponse"),
+                  QStringLiteral("api_request_error"),
+                  QStringLiteral("daemon_error"),
+                  QStringLiteral("json_rpc"),
+                  logging::defaultWho(),
+                  QString(),
+                  nlohmann::json{{"method", pending.method.toStdString()},
+                                 {"id", id}});
         return;
     }
 
@@ -132,6 +163,15 @@ void WatchClient::handleResponse(const QJsonObject &obj)
     }
 
     const QJsonObject result = resultValue.toObject();
+    KLOG_DEBUG(QStringLiteral("WatchClient"),
+               QStringLiteral("handleResponse"),
+               QStringLiteral("api_request_completed"),
+               QStringLiteral("daemon_response"),
+               QStringLiteral("json_rpc"),
+               logging::defaultWho(),
+               QString(),
+               nlohmann::json{{"method", pending.method.toStdString()},
+                              {"id", id}});
     if (pending.method == "list_watch_rules") {
         emit rulesLoaded(result.value("rules").toArray().toVariantList());
         return;
