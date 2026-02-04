@@ -351,6 +351,7 @@ Kirigami.ApplicationWindow {
                 visible: root.diffModel && root.diffModel.length > 0
             }
         }
+        }
     }
 
     Component {
