@@ -28,19 +28,42 @@ stability, regressions, and risk.
 - `khronicle-tray` — lightweight tray mini-viewer for “what changed today?”.
 - `khronicle-report` — CLI reporting, bundle export, and aggregation tools.
 
+## Dependencies
+
+- Qt6 (Core, Gui, Qml, Quick, QuickControls2, Widgets, Network, Test)
+- KF6 Kirigami
+- Kirigami Addons (optional, for enhanced UI components)
+- SQLite3
+- nlohmann-json (fetched automatically via CMake if not found)
+
 ## Installation
 
 Khronicle targets CachyOS / Arch-based systems with Qt6 and KDE Plasma 6.
-A sample PKGBUILD lives in `packaging/PKGBUILD`.
 
-To build manually:
+### Dependencies (Arch/CachyOS)
 
 ```bash
+sudo pacman -S qt6-base qt6-declarative kirigami kirigami-addons sqlite nlohmann-json cmake make gcc
+```
+
+### Building from Source
+
+```bash
+git clone https://github.com/infinityabundance/Khronicle.git
+cd Khronicle
 cmake -S . -B build
 cmake --build build
 ```
 
-To install via the provided package:
+Run:
+
+```bash
+./build/khronicle
+```
+
+### Via PKGBUILD (Arch/CachyOS)
+
+A sample PKGBUILD lives in `packaging/PKGBUILD`.
 
 ```bash
 cd packaging
