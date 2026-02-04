@@ -91,6 +91,8 @@ For a deeper architecture walk-through:
 - `GOVERNANCE.md` — stewardship and decision-making principles
 - `STABILITY.md` — compatibility guarantees and versioning
 - `EVOLUTION.md` — how Khronicle grows without losing integrity
+- `INVARIANTS.md` — non-negotiable system properties
+- `TRUTH-MODEL.md` — what Khronicle claims vs does not claim
 - `CONTRIBUTING.md` — contributor contract and review checklist
 - `FUTURE.md` — non-binding ideas and open questions
 
@@ -104,6 +106,14 @@ Khronicle is a local recorder and explainer. It does not:
 - Send data over the network by default
 
 Its accuracy depends on the logs and snapshots it reads.
+
+## What Khronicle Is Not
+
+- Not a monitoring agent
+- Not a security product
+- Not a policy engine
+- Not a predictive or AI-driven system
+- Not an enforcement tool
 
 ## Contributing & Development
 

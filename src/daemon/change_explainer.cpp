@@ -7,6 +7,8 @@ namespace khronicle {
 std::string explainChange(const KhronicleDiff &diff,
                           const std::vector<KhronicleEvent> &events)
 {
+    // INVARIANT: No silent inference.
+    // Explanations are interpretive summaries derived from recorded facts.
     bool kernelChange = false;
     bool gpuChange = false;
     bool firmwareChange = false;

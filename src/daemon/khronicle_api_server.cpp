@@ -240,6 +240,7 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
         } else if (method == "summary_since") {
+            // INVARIANT: Summaries are interpretations derived from stored facts.
             const std::string sinceValue = params.value("since", "");
             const auto since = fromIso8601Utc(sinceValue);
             if (since == std::chrono::system_clock::time_point{}) {
@@ -349,6 +350,7 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
         } else if (method == "explain_change_between") {
+            // INVARIANT: Explanations are interpretive, not causal assertions.
             const std::string fromValue = params.value("from", "");
             const std::string toValue = params.value("to", "");
             const auto from = fromIso8601Utc(fromValue);

@@ -11,6 +11,8 @@ CounterfactualResult computeCounterfactual(
     const SystemSnapshot &comparison,
     const std::vector<KhronicleEvent> &interveningEvents)
 {
+    // INVARIANT: Facts precede interpretation.
+    // Counterfactual output is derived from stored snapshots/events.
     CounterfactualResult result;
     result.baselineSnapshotId = baseline.id;
     result.comparisonSnapshotId = comparison.id;

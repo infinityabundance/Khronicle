@@ -22,10 +22,18 @@ Before submitting, confirm:
 - Does it break existing data or schema expectations?
 - Are docs updated where users or contributors would notice?
 
+## Epistemic Review Checklist
+
+Before submitting, also confirm:
+
+- Does this blur the line between fact and interpretation?
+- Does this introduce implicit inference?
+- Does this reduce inspectability or auditability?
+- Does this weaken or bypass an invariant?
+
 ## Style & Philosophy
 
 Khronicle optimizes for long-term understanding, not short-term novelty.
 If a change is clever but not clear, favor the clear version.
 
 See `GOVERNANCE.md` for decision-making principles.
-
