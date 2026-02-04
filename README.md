@@ -47,6 +47,44 @@ cd packaging
 makepkg -si
 ```
 
+## What Khronicle Is Not
+
+- Not a monitoring agent
+- Not a security product
+- Not a policy engine
+- Not a predictive or AI-driven system
+- Not an enforcement tool
+
+## How to Read This Project
+
+Khronicle’s documentation describes design intent, architectural goals, and
+interpretive aims. These descriptions are not promises and not assurances of
+correctness, completeness, reliability, or suitability.
+
+In practice, some system changes may not be observed. Recorded data may be
+partial, delayed, or misleading. Interpretations and explanations may be wrong.
+Rules and signals may fail to trigger or may trigger unnecessarily. This is
+expected.
+
+Khronicle is best understood as an exploratory and interpretive aid for
+examining system history, not as an authority or source of truth. Users should
+assume that any expectation described in this documentation may fail to be met,
+and should not rely on Khronicle as a sole basis for decisions, judgments, or
+actions.
+
+## Quick Start (Single Command)
+
+After installation, you can run:
+
+```bash
+khronicle
+```
+
+The application attempts to start the daemon if it is not already running and
+may also start the tray app for convenience. On systems with different service
+managers or policies, you may still need to start the daemon manually (see
+below).
+
 ## Running Khronicle
 
 Start the daemon (systemd user service):
@@ -62,11 +100,17 @@ Start the GUI:
 khronicle
 ```
 
+The GUI shows daemon status and provides start/stop controls, plus a “Start
+tray” button.
+
 Optional tray mini-viewer:
 
 ```bash
 systemctl --user enable --now khronicle-tray
 ```
+
+The tray shows daemon status, start/stop actions, and opens the UI on
+left-click. It also provides an About dialog.
 
 Run the report tool:
 
@@ -106,31 +150,6 @@ Khronicle is a local recorder and explainer. It does not:
 - Send data over the network by default
 
 Its accuracy depends on the logs and snapshots it reads.
-
-## What Khronicle Is Not
-
-- Not a monitoring agent
-- Not a security product
-- Not a policy engine
-- Not a predictive or AI-driven system
-- Not an enforcement tool
-
-## How to Read This Project
-
-Khronicle’s documentation describes design intent, architectural goals, and
-interpretive aims. These descriptions are not promises and not assurances of
-correctness, completeness, reliability, or suitability.
-
-In practice, some system changes may not be observed. Recorded data may be
-partial, delayed, or misleading. Interpretations and explanations may be wrong.
-Rules and signals may fail to trigger or may trigger unnecessarily. This is
-expected.
-
-Khronicle is best understood as an exploratory and interpretive aid for
-examining system history, not as an authority or source of truth. Users should
-assume that any expectation described in this documentation may fail to be met,
-and should not rely on Khronicle as a sole basis for decisions, judgments, or
-actions.
 
 ## Contributing & Development
 

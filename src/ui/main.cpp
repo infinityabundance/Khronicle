@@ -1,15 +1,19 @@
 #include <QCoreApplication>
 #include <memory>
+#include <chrono>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QCommandLineParser>
+#include <QThread>
 
 #include "ui/backend/KhronicleApiClient.hpp"
+#include "ui/backend/DaemonController.hpp"
 #include "ui/backend/FleetModel.hpp"
 #include "ui/backend/WatchClient.hpp"
 #include "common/logging.hpp"
+#include "common/process_utils.hpp"
 #include <nlohmann/json.hpp>
 
 int main(int argc, char *argv[])
@@ -34,6 +38,7 @@ int main(int argc, char *argv[])
     std::unique_ptr<khronicle::FleetModel> fleetModel;
     std::unique_ptr<khronicle::KhronicleApiClient> apiClient;
     std::unique_ptr<khronicle::WatchClient> watchClient;
+    std::unique_ptr<khronicle::DaemonController> daemonController;
 
     const bool codexTrace = parser.isSet(codexOption)
         || qEnvironmentVariableIntValue("KHRONICLE_CODEX_TRACE") == 1;
@@ -47,6 +52,40 @@ int main(int argc, char *argv[])
               khronicle::logging::defaultWho(),
               QString(),
               nlohmann::json{{"fleetMode", parser.isSet(fleetOption)}});
+
+    if (!parser.isSet(fleetOption)) {
+        if (!khronicle::isDaemonRunning()) {
+            KLOG_INFO(QStringLiteral("main"),
+                      QStringLiteral("main"),
+                      QStringLiteral("auto_start_daemon"),
+                      QStringLiteral("ui_start"),
+                      QStringLiteral("best_effort"),
+                      khronicle::logging::defaultWho(),
+                      QString(),
+                      nlohmann::json::object());
+            khronicle::startDaemon();
+            const auto start = std::chrono::steady_clock::now();
+            while (!khronicle::isDaemonRunning()) {
+                if (std::chrono::steady_clock::now() - start
+                    > std::chrono::seconds(1)) {
+                    break;
+                }
+                QThread::msleep(100);
+            }
+        }
+
+        if (qEnvironmentVariableIntValue("KHRONICLE_NO_TRAY_ON_START") != 1) {
+            KLOG_INFO(QStringLiteral("main"),
+                      QStringLiteral("main"),
+                      QStringLiteral("auto_start_tray"),
+                      QStringLiteral("ui_start"),
+                      QStringLiteral("best_effort"),
+                      khronicle::logging::defaultWho(),
+                      QString(),
+                      nlohmann::json::object());
+            khronicle::startTray();
+        }
+    }
 
     if (parser.isSet(fleetOption)) {
         // Fleet mode is offline and read-only: it loads aggregate JSON directly.
@@ -64,6 +103,9 @@ int main(int argc, char *argv[])
         watchClient = std::make_unique<khronicle::WatchClient>();
         engine.rootContext()->setContextProperty(QStringLiteral("watchClient"),
                                                  watchClient.get());
+        daemonController = std::make_unique<khronicle::DaemonController>();
+        engine.rootContext()->setContextProperty(QStringLiteral("daemonController"),
+                                                 daemonController.get());
         url = QUrl::fromLocalFile(
             QStringLiteral(KHRONICLE_QML_DIR "/Main.qml"));
     }

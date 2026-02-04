@@ -22,6 +22,7 @@ add_executable(khronicle-daemon
     src/daemon/khronicle_daemon.cpp
     src/daemon/watch_engine.cpp
     src/common/logging.cpp
+    src/common/process_utils.cpp
     src/debug/scenario_capture.cpp
 )
 
@@ -41,9 +42,11 @@ target_link_libraries(khronicle-daemon
 add_executable(khronicle
     src/ui/main.cpp
     src/ui/backend/KhronicleApiClient.cpp
+    src/ui/backend/DaemonController.cpp
     src/ui/backend/FleetModel.cpp
     src/ui/backend/WatchClient.cpp
     src/common/logging.cpp
+    src/common/process_utils.cpp
     src/debug/scenario_capture.cpp
 )
 
@@ -73,6 +76,7 @@ add_executable(khronicle-tray
     src/tray/main.cpp
     src/tray/KhronicleTray.cpp
     src/common/logging.cpp
+    src/common/process_utils.cpp
     src/debug/scenario_capture.cpp
 )
 
@@ -98,6 +102,7 @@ add_executable(khronicle-report
     src/daemon/change_explainer.cpp
     src/daemon/counterfactual.cpp
     src/common/logging.cpp
+    src/common/process_utils.cpp
     src/debug/scenario_capture.cpp
 )
 
@@ -105,6 +110,7 @@ add_executable(khronicle-replay
     src/replay/main.cpp
     src/replay/ReplayHarness.cpp
     src/common/logging.cpp
+    src/common/process_utils.cpp
     src/debug/scenario_capture.cpp
     src/daemon/khronicle_store.cpp
     src/daemon/khronicle_api_server.cpp
