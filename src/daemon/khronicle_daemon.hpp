@@ -52,6 +52,11 @@ private:
     std::optional<std::string> m_pacmanCursor;
     std::chrono::system_clock::time_point m_journalLastTimestamp;
     std::optional<SystemSnapshot> m_lastSnapshot;
+
+    int m_pacmanErrorCount = 0;
+    int m_journalErrorCount = 0;
+    int m_pacmanBackoffCycles = 0;
+    int m_journalBackoffCycles = 0;
 };
 
 } // namespace khronicle

@@ -10,12 +10,16 @@
 #include <QDateTime>
 #include <QProcess>
 #include <QStringList>
+#include <QDebug>
 
 #include <nlohmann/json.hpp>
 
 namespace khronicle {
 
 namespace {
+
+constexpr auto kMaxJournalLookback = std::chrono::hours(24 * 7); // 7 days
+constexpr int kMaxJournalLines = 5000;
 
 QString toIsoSince(std::chrono::system_clock::time_point since)
 {
@@ -123,13 +127,27 @@ JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since
     JournalParseResult result;
     result.lastTimestamp = since;
 
+    const auto now = std::chrono::system_clock::now();
+    // Clamp lookback to avoid expensive first-runs on huge journals.
+    if (now - since > kMaxJournalLookback) {
+        qInfo() << "Khronicle: clamping journal lookback to 7 days.";
+        since = now - kMaxJournalLookback;
+        result.lastTimestamp = since;
+    }
+
     QProcess process;
     QString sinceArg = QStringLiteral("--since=%1").arg(toIsoSince(since));
+    // Cap the number of lines per run to keep ingestion bounded.
+    QString linesArg = QStringLiteral("--lines=%1").arg(kMaxJournalLines);
     process.start(QStringLiteral("journalctl"),
-                  {sinceArg, QStringLiteral("--output=short-iso")});
+                  {sinceArg,
+                   QStringLiteral("--output=short-iso"),
+                   QStringLiteral("--no-pager"),
+                   linesArg});
 
     if (!process.waitForStarted()) {
         // If journalctl cannot start, return empty events and keep lastTimestamp unchanged.
+        result.hadError = true;
         return result;
     }
 
@@ -137,10 +155,12 @@ JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since
 
     if (!process.waitForFinished()) {
         // If journalctl fails, return empty events and keep lastTimestamp unchanged.
+        result.hadError = true;
         return result;
     }
 
     if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+        result.hadError = true;
         return result;
     }
 

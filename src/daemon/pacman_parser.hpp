@@ -12,6 +12,7 @@ struct PacmanParseResult {
     std::vector<KhronicleEvent> events;
     // Cursor is a string-encoded file offset; the daemon will store this in the meta table.
     std::string newCursor;
+    bool hadError = false;
 };
 
 /**

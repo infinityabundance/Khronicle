@@ -13,6 +13,7 @@ struct JournalParseResult {
     std::vector<KhronicleEvent> events;
     // The timestamp of the last processed journal entry, or the input 'since' if none were found.
     std::chrono::system_clock::time_point lastTimestamp;
+    bool hadError = false;
 };
 
 /**

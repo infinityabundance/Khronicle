@@ -1,5 +1,6 @@
 #include "daemon/khronicle_api_server.hpp"
 
+#include <algorithm>
 #include <optional>
 
 #include <QFile>
@@ -34,6 +35,25 @@ std::optional<std::string> extractKernelVersion(const nlohmann::json &state)
         return std::nullopt;
     }
     return it->get<std::string>();
+}
+
+std::optional<std::chrono::system_clock::time_point> latestSnapshotTimestamp(
+    const std::vector<SystemSnapshot> &snapshots)
+{
+    if (snapshots.empty()) {
+        return std::nullopt;
+    }
+
+    auto latest = std::max_element(
+        snapshots.begin(), snapshots.end(),
+        [](const SystemSnapshot &a, const SystemSnapshot &b) {
+            return a.timestamp < b.timestamp;
+        });
+
+    if (latest == snapshots.end()) {
+        return std::nullopt;
+    }
+    return latest->timestamp;
 }
 
 } // namespace
@@ -265,6 +285,26 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             result["gpuEvents"] = gpuEvents;
             result["firmwareEvents"] = firmwareEvents;
             result["totalEvents"] = static_cast<int>(events.size());
+
+            const QByteArray response = makeResultResponse(result, id);
+            socket->write(response);
+        } else if (method == "get_daemon_status") {
+            nlohmann::json result;
+            result["version"] = "0.1.0";
+
+            if (const auto cursor = m_store.getMeta("pacman_last_cursor")) {
+                result["pacmanLastCursor"] = *cursor;
+            }
+            if (const auto journal = m_store.getMeta("journal_last_timestamp")) {
+                result["journalLastTimestamp"] = *journal;
+            }
+
+            const auto snapshots = m_store.listSnapshots();
+            if (const auto ts = latestSnapshotTimestamp(snapshots)) {
+                result["lastSnapshotTimestamp"] = toIso8601Utc(*ts);
+            }
+
+            result["ingestionIntervalSeconds"] = 300;
 
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);

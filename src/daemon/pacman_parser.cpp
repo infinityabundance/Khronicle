@@ -2,10 +2,11 @@
 
 #include <chrono>
 #include <cctype>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <optional>
-#include <regex>
 #include <sstream>
 #include <string>
 #include <unordered_set>
@@ -16,17 +17,23 @@ namespace khronicle {
 
 namespace {
 
+constexpr std::size_t kMaxBytesPerRun = 5 * 1024 * 1024; // 5 MiB
+
 // Cursor is a byte offset into pacman.log.
-std::streampos parseCursor(const std::optional<std::string> &cursor)
+std::optional<std::streampos> parseCursor(const std::optional<std::string> &cursor)
 {
     if (!cursor.has_value()) {
-        return std::streampos(0);
+        return std::nullopt;
     }
 
     try {
-        return static_cast<std::streampos>(std::stoll(*cursor));
+        const long long value = std::stoll(*cursor);
+        if (value < 0) {
+            return std::nullopt;
+        }
+        return static_cast<std::streampos>(value);
     } catch (const std::exception &) {
-        return std::streampos(0);
+        return std::nullopt;
     }
 }
 
@@ -76,20 +83,60 @@ struct ParsedLine {
 
 std::optional<ParsedLine> parseLine(const std::string &line)
 {
-    static const std::regex pattern(
-        R"(^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2})\]\s+\[ALPM\]\s+"
-        R"((installed|upgraded|downgraded)\s+([^\s]+)\s+\(([^\)]*)\))");
+    // Expected format: [YYYY-MM-DD HH:MM] [ALPM] <operation> <package> (<versions>)
+    const std::string alpmTag = " [ALPM] ";
+    const std::string ops[] = {"installed", "upgraded", "downgraded"};
 
-    std::smatch match;
-    if (!std::regex_search(line, match, pattern)) {
+    if (line.empty() || line[0] != '[') {
+        return std::nullopt;
+    }
+
+    const size_t tsEnd = line.find(']');
+    if (tsEnd == std::string::npos) {
+        return std::nullopt;
+    }
+
+    const size_t alpmPos = line.find(alpmTag, tsEnd);
+    if (alpmPos == std::string::npos) {
+        return std::nullopt;
+    }
+
+    const size_t opStart = alpmPos + alpmTag.size();
+    const size_t opEnd = line.find(' ', opStart);
+    if (opEnd == std::string::npos) {
+        return std::nullopt;
+    }
+
+    const std::string operation = line.substr(opStart, opEnd - opStart);
+    bool opOk = false;
+    for (const auto &op : ops) {
+        if (operation == op) {
+            opOk = true;
+            break;
+        }
+    }
+    if (!opOk) {
+        return std::nullopt;
+    }
+
+    const size_t pkgStart = opEnd + 1;
+    const size_t pkgEnd = line.find(' ', pkgStart);
+    if (pkgEnd == std::string::npos) {
+        return std::nullopt;
+    }
+
+    const size_t openParen = line.find('(', pkgEnd);
+    const size_t closeParen = line.find(')', openParen);
+    if (openParen == std::string::npos || closeParen == std::string::npos
+        || closeParen <= openParen + 1) {
         return std::nullopt;
     }
 
     ParsedLine parsed;
-    parsed.timestamp = match[1].str();
-    parsed.operation = match[2].str();
-    parsed.packageName = match[3].str();
-    parsed.versionInfo = match[4].str();
+    parsed.timestamp = line.substr(1, tsEnd - 1);
+    parsed.operation = operation;
+    parsed.packageName = line.substr(pkgStart, pkgEnd - pkgStart);
+    parsed.versionInfo = line.substr(openParen + 1, closeParen - openParen - 1);
     return parsed;
 }
 
@@ -203,16 +250,42 @@ PacmanParseResult parsePacmanLog(const std::string &path,
     if (!file.is_open()) {
         // If the log can't be opened, keep the previous cursor so we don't skip data.
         result.newCursor = previousCursor.value_or("0");
+        result.hadError = true;
         return result;
     }
 
-    const std::streampos startPos = parseCursor(previousCursor);
+    std::error_code error;
+    const std::uintmax_t fileSize = std::filesystem::file_size(path, error);
+
+    std::streampos startPos = std::streampos(0);
+    if (const auto cursor = parseCursor(previousCursor)) {
+        startPos = *cursor;
+    }
+
+    if (!error && fileSize > 0) {
+        const std::streamoff startOff = startPos;
+        if (startOff > 0 && static_cast<std::uintmax_t>(startOff) > fileSize) {
+            // Log rotation or truncation detected: reset cursor to start of file.
+            std::cerr << "Khronicle: pacman.log cursor beyond file size; resetting.\n";
+            startPos = std::streampos(0);
+        }
+    }
+
     file.seekg(startPos);
 
     std::string line;
+    // Cap bytes processed per run to keep ingestion cycles bounded.
+    std::size_t bytesConsumed = 0;
+    std::streampos lastPos = file.tellg();
     while (std::getline(file, line)) {
+        bytesConsumed += line.size() + 1;
+        lastPos = file.tellg();
+
         auto parsed = parseLine(line);
         if (!parsed.has_value()) {
+            if (bytesConsumed >= kMaxBytesPerRun) {
+                break;
+            }
             continue;
         }
 
@@ -246,6 +319,10 @@ PacmanParseResult parsePacmanLog(const std::string &path,
         event.relatedPackages = {parsed->packageName};
 
         result.events.push_back(std::move(event));
+
+        if (bytesConsumed >= kMaxBytesPerRun) {
+            break;
+        }
     }
 
     std::streampos endPos = file.tellg();
@@ -259,7 +336,11 @@ PacmanParseResult parsePacmanLog(const std::string &path,
     if (endPos == std::streampos(-1)) {
         result.newCursor = previousCursor.value_or("0");
     } else {
-        result.newCursor = std::to_string(static_cast<long long>(endPos));
+        const std::streampos cursorPos =
+            (bytesConsumed >= kMaxBytesPerRun && lastPos != std::streampos(-1))
+            ? lastPos
+            : endPos;
+        result.newCursor = std::to_string(static_cast<long long>(cursorPos));
     }
 
     return result;

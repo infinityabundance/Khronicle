@@ -4,6 +4,7 @@
 #include <chrono>
 
 #include <QTimer>
+#include <QDebug>
 
 #include "daemon/khronicle_api_server.hpp"
 #include "daemon/journal_parser.hpp"
@@ -18,6 +19,10 @@ namespace khronicle {
 namespace {
 
 constexpr int kIngestionIntervalMs = 300000;
+constexpr auto kMaxCycleDuration = std::chrono::milliseconds(2000);
+constexpr auto kMaxJournalLookback = std::chrono::hours(24 * 7);
+constexpr int kMaxConsecutiveErrors = 3;
+constexpr int kBackoffCycles = 2;
 
 std::chrono::system_clock::time_point defaultJournalStart()
 {
@@ -27,15 +32,6 @@ std::chrono::system_clock::time_point defaultJournalStart()
 std::string timePointToIso(std::chrono::system_clock::time_point time)
 {
     return toIso8601Utc(time);
-}
-
-std::chrono::system_clock::time_point isoToTimePoint(const std::string &value)
-{
-    auto parsed = fromIso8601Utc(value);
-    if (parsed == std::chrono::system_clock::time_point{}) {
-        return defaultJournalStart();
-    }
-    return parsed;
 }
 
 std::string detectKernelPackage(const SystemSnapshot &snapshot)
@@ -85,14 +81,33 @@ void KhronicleDaemon::start()
 
 void KhronicleDaemon::runIngestionCycle()
 {
+    const auto cycleStart = std::chrono::steady_clock::now();
+
     runPacmanIngestion();
+    if (std::chrono::steady_clock::now() - cycleStart > kMaxCycleDuration) {
+        qWarning() << "Khronicle: Ingestion cycle exceeded time budget, deferring remaining work.";
+        persistStateToMeta();
+        return;
+    }
+
     runJournalIngestion();
+    if (std::chrono::steady_clock::now() - cycleStart > kMaxCycleDuration) {
+        qWarning() << "Khronicle: Ingestion cycle exceeded time budget, deferring remaining work.";
+        persistStateToMeta();
+        return;
+    }
+
     runSnapshotCheck();
     persistStateToMeta();
 }
 
 void KhronicleDaemon::runPacmanIngestion()
 {
+    if (m_pacmanBackoffCycles > 0) {
+        --m_pacmanBackoffCycles;
+        return;
+    }
+
     const PacmanParseResult result =
         parsePacmanLog("/var/log/pacman.log", m_pacmanCursor);
 
@@ -103,10 +118,26 @@ void KhronicleDaemon::runPacmanIngestion()
     if (!result.newCursor.empty()) {
         m_pacmanCursor = result.newCursor;
     }
+
+    if (result.hadError) {
+        m_pacmanErrorCount++;
+        if (m_pacmanErrorCount >= kMaxConsecutiveErrors) {
+            qWarning() << "Khronicle: pacman ingestion failed repeatedly, backing off.";
+            m_pacmanBackoffCycles = kBackoffCycles;
+            m_pacmanErrorCount = 0;
+        }
+    } else {
+        m_pacmanErrorCount = 0;
+    }
 }
 
 void KhronicleDaemon::runJournalIngestion()
 {
+    if (m_journalBackoffCycles > 0) {
+        --m_journalBackoffCycles;
+        return;
+    }
+
     const JournalParseResult result = parseJournalSince(m_journalLastTimestamp);
 
     for (const auto &event : result.events) {
@@ -115,6 +146,17 @@ void KhronicleDaemon::runJournalIngestion()
 
     if (result.lastTimestamp > m_journalLastTimestamp) {
         m_journalLastTimestamp = result.lastTimestamp;
+    }
+
+    if (result.hadError) {
+        m_journalErrorCount++;
+        if (m_journalErrorCount >= kMaxConsecutiveErrors) {
+            qWarning() << "Khronicle: journal ingestion failed repeatedly, backing off.";
+            m_journalBackoffCycles = kBackoffCycles;
+            m_journalErrorCount = 0;
+        }
+    } else {
+        m_journalErrorCount = 0;
     }
 }
 
@@ -159,12 +201,27 @@ void KhronicleDaemon::runSnapshotCheck()
 void KhronicleDaemon::loadStateFromMeta()
 {
     if (const auto pacmanCursor = m_store->getMeta("pacman_last_cursor")) {
-        m_pacmanCursor = *pacmanCursor;
+        try {
+            const long long value = std::stoll(*pacmanCursor);
+            if (value >= 0) {
+                m_pacmanCursor = *pacmanCursor;
+            } else {
+                m_pacmanCursor.reset();
+            }
+        } catch (const std::exception &) {
+            m_pacmanCursor.reset();
+        }
     }
 
     if (const auto journalTimestamp =
             m_store->getMeta("journal_last_timestamp")) {
-        m_journalLastTimestamp = isoToTimePoint(*journalTimestamp);
+        auto parsed = fromIso8601Utc(*journalTimestamp);
+        if (parsed == std::chrono::system_clock::time_point{}) {
+            m_journalLastTimestamp =
+                std::chrono::system_clock::now() - kMaxJournalLookback;
+        } else {
+            m_journalLastTimestamp = parsed;
+        }
     }
 }
 
