@@ -34,6 +34,7 @@ public:
     Q_INVOKABLE void loadSummarySince(const QDateTime &since);
     Q_INVOKABLE void loadSnapshots();
     Q_INVOKABLE void loadDiff(const QString &snapshotAId, const QString &snapshotBId);
+    Q_INVOKABLE void loadExplanationBetween(const QDateTime &from, const QDateTime &to);
 
 signals:
     void connectedChanged(bool connected);
@@ -43,6 +44,7 @@ signals:
     void summaryLoaded(const QVariantMap &summary);
     void snapshotsLoaded(const QVariantList &snapshots);
     void diffLoaded(const QVariantList &diffRows);
+    void explanationLoaded(const QString &summary);
 
     // For debug / error reporting in QML:
     void errorOccurred(const QString &message);

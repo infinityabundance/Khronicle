@@ -26,6 +26,10 @@ public:
 
     std::vector<SystemSnapshot> listSnapshots() const;
     std::optional<SystemSnapshot> getSnapshot(const std::string &id) const;
+    std::optional<SystemSnapshot> getSnapshotBefore(
+        std::chrono::system_clock::time_point t) const;
+    std::optional<SystemSnapshot> getSnapshotAfter(
+        std::chrono::system_clock::time_point t) const;
 
     KhronicleDiff diffSnapshots(const std::string &aId, const std::string &bId) const;
 

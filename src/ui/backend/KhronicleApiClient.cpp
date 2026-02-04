@@ -83,6 +83,15 @@ void KhronicleApiClient::loadDiff(const QString &snapshotAId,
     sendRequest(QStringLiteral("diff_snapshots"), params);
 }
 
+void KhronicleApiClient::loadExplanationBetween(const QDateTime &from,
+                                                const QDateTime &to)
+{
+    QJsonObject params;
+    params["from"] = toIso8601Utc(from);
+    params["to"] = toIso8601Utc(to);
+    sendRequest(QStringLiteral("explain_change_between"), params);
+}
+
 void KhronicleApiClient::onSocketConnected()
 {
     m_connected = true;
@@ -185,6 +194,11 @@ void KhronicleApiClient::handleResponse(const QJsonObject &obj)
 
     if (pending.method == "diff_snapshots") {
         emit diffLoaded(convertDiffJsonToVariantList(result.value("diff")));
+        return;
+    }
+
+    if (pending.method == "explain_change_between") {
+        emit explanationLoaded(result.value("summary").toString());
         return;
     }
 

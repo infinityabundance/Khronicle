@@ -1,5 +1,7 @@
 #include "daemon/khronicle_api_server.hpp"
 
+#include <algorithm>
+#include <chrono>
 #include <optional>
 
 #include <QFile>
@@ -9,6 +11,7 @@
 #include <unistd.h>
 
 #include "common/json_utils.hpp"
+#include "daemon/counterfactual.hpp"
 
 namespace khronicle {
 
@@ -34,6 +37,25 @@ std::optional<std::string> extractKernelVersion(const nlohmann::json &state)
         return std::nullopt;
     }
     return it->get<std::string>();
+}
+
+std::optional<SystemSnapshot> latestSnapshot(
+    const std::vector<SystemSnapshot> &snapshots)
+{
+    if (snapshots.empty()) {
+        return std::nullopt;
+    }
+
+    auto latest = std::max_element(
+        snapshots.begin(), snapshots.end(),
+        [](const SystemSnapshot &a, const SystemSnapshot &b) {
+            return a.timestamp < b.timestamp;
+        });
+
+    if (latest == snapshots.end()) {
+        return std::nullopt;
+    }
+    return *latest;
 }
 
 } // namespace
@@ -265,6 +287,75 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             result["gpuEvents"] = gpuEvents;
             result["firmwareEvents"] = firmwareEvents;
             result["totalEvents"] = static_cast<int>(events.size());
+
+            const QByteArray response = makeResultResponse(result, id);
+            socket->write(response);
+        } else if (method == "explain_change_between") {
+            const std::string fromValue = params.value("from", "");
+            const std::string toValue = params.value("to", "");
+            const auto from = fromIso8601Utc(fromValue);
+            const auto to = fromIso8601Utc(toValue);
+            if (from == std::chrono::system_clock::time_point{}
+                || to == std::chrono::system_clock::time_point{}) {
+                const QByteArray response = makeErrorResponse("Invalid from/to timestamp", id);
+                socket->write(response);
+                socket->flush();
+                socket->disconnectFromServer();
+                return;
+            }
+
+            const auto baseline = m_store.getSnapshotBefore(from);
+            const auto comparison = m_store.getSnapshotAfter(to);
+            if (!baseline.has_value() || !comparison.has_value()) {
+                const QByteArray response = makeErrorResponse("Snapshots not found", id);
+                socket->write(response);
+                socket->flush();
+                socket->disconnectFromServer();
+                return;
+            }
+
+            const auto events = m_store.getEventsBetween(from, to);
+            const auto resultData =
+                computeCounterfactual(*baseline, *comparison, events);
+
+            nlohmann::json result;
+            result["baselineSnapshot"] = resultData.baselineSnapshotId;
+            result["comparisonSnapshot"] = resultData.comparisonSnapshotId;
+            result["summary"] = resultData.explanationSummary;
+            result["diff"] = resultData.diff;
+
+            const QByteArray response = makeResultResponse(result, id);
+            socket->write(response);
+        } else if (method == "what_changed_since_last_good") {
+            const std::string referenceId = params.value("referenceSnapshotId", "");
+            if (referenceId.empty()) {
+                const QByteArray response = makeErrorResponse("Missing referenceSnapshotId", id);
+                socket->write(response);
+                socket->flush();
+                socket->disconnectFromServer();
+                return;
+            }
+
+            const auto baseline = m_store.getSnapshot(referenceId);
+            const auto latest = latestSnapshot(m_store.listSnapshots());
+            if (!baseline.has_value() || !latest.has_value()) {
+                const QByteArray response = makeErrorResponse("Snapshots not found", id);
+                socket->write(response);
+                socket->flush();
+                socket->disconnectFromServer();
+                return;
+            }
+
+            const auto events = m_store.getEventsBetween(baseline->timestamp,
+                                                        latest->timestamp);
+            const auto resultData =
+                computeCounterfactual(*baseline, *latest, events);
+
+            nlohmann::json result;
+            result["baselineSnapshot"] = resultData.baselineSnapshotId;
+            result["comparisonSnapshot"] = resultData.comparisonSnapshotId;
+            result["summary"] = resultData.explanationSummary;
+            result["diff"] = resultData.diff;
 
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);
