@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Khronicle Tray
+Comment=Khronicle system change tray viewer
+Exec=khronicle-tray
+Icon=view-list-details
+Terminal=false
+Categories=System;Utility;
+NoDisplay=true

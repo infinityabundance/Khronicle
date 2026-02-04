@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Khronicle
+Comment=System and driver change timeline
+Exec=khronicle
+Icon=view-list-details
+Terminal=false
+Categories=System;Utility;Monitor;
+StartupNotify=true

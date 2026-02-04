@@ -1,0 +1,13 @@
+[Unit]
+Description=Khronicle System Change Daemon
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/khronicle-daemon
+Restart=on-failure
+RestartSec=5
+Environment=QT_LOGGING_RULES=*.debug=false
+
+[Install]
+WantedBy=default.target

@@ -77,3 +77,19 @@ target_link_libraries(khronicle-tray
         Qt6::Gui
         Qt6::Widgets
 )
+
+install(TARGETS khronicle khronicle-daemon khronicle-tray
+    RUNTIME DESTINATION bin
+)
+
+install(FILES
+    resources/desktop/khronicle.desktop
+    resources/desktop/khronicle-tray.desktop
+    DESTINATION share/applications
+)
+
+install(FILES
+    resources/systemd/khronicle-daemon.service
+    resources/systemd/khronicle-tray.service
+    DESTINATION share/systemd/user
+)

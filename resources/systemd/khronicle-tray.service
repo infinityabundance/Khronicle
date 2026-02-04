@@ -1,0 +1,12 @@
+[Unit]
+Description=Khronicle Tray Mini Viewer
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/khronicle-tray
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
