@@ -43,20 +43,22 @@ Khronicle targets CachyOS / Arch-based systems with Qt6 and KDE Plasma 6.
 ### Dependencies (Arch/CachyOS)
 
 ```bash
-sudo pacman -S qt6-base qt6-declarative qt6-quickcontrols2 kirigami kf6-kirigami-addons sqlite nlohmann-json cmake make gcc
+sudo pacman -S qt6-base qt6-declarative kirigami kirigami-addons sqlite nlohmann-json cmake make gcc
 ```
 
 ### Building from Source
 
 ```bash
-git clone https://github.com/infinityabundance/Khronicle.git && cd Khronicle && mkdir build && cd build && cmake .. && make -j$(nproc)
+git clone https://github.com/infinityabundance/Khronicle.git
+cd Khronicle
+cmake -S . -B build
+cmake --build build
 ```
 
-Run tests and install (optional):
+Run:
 
 ```bash
-ctest
-sudo make install
+./build/khronicle
 ```
 
 ### Via PKGBUILD (Arch/CachyOS)
