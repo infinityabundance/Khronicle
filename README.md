@@ -88,6 +88,11 @@ For a deeper architecture walk-through:
 - `ARCHITECTURE.md` — software architecture and data flow
 - `SYSTEMS-ARCHITECTURE.md` — OS integration and service model
 - `CODE.md` — top-down codebase navigation guide
+- `GOVERNANCE.md` — stewardship and decision-making principles
+- `STABILITY.md` — compatibility guarantees and versioning
+- `EVOLUTION.md` — how Khronicle grows without losing integrity
+- `CONTRIBUTING.md` — contributor contract and review checklist
+- `FUTURE.md` — non-binding ideas and open questions
 
 ## Trust & Scope
 
