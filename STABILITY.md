@@ -1,4 +1,4 @@
-# Stability Intent
+# Stability
 
 This document describes intended compatibility expectations; it does not
 promise behavior, correctness, or long-term adherence.
