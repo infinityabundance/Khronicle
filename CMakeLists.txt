@@ -78,7 +78,25 @@ target_link_libraries(khronicle-tray
         Qt6::Widgets
 )
 
-install(TARGETS khronicle khronicle-daemon khronicle-tray
+add_executable(khronicle-report
+    src/report/main.cpp
+    src/report/ReportCli.cpp
+)
+
+target_include_directories(khronicle-report
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common
+)
+
+target_link_libraries(khronicle-report
+    PRIVATE
+        Qt6::Core
+        nlohmann_json::nlohmann_json
+        SQLite::SQLite3
+)
+
+install(TARGETS khronicle khronicle-daemon khronicle-tray khronicle-report
     RUNTIME DESTINATION bin
 )
 
