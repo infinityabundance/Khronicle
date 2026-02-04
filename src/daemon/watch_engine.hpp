@@ -15,6 +15,8 @@ class WatchEngine {
 public:
     explicit WatchEngine(KhronicleStore &store);
 
+    // INVARIANT: Rules are declarative and inspectable.
+    // Do not introduce executable scripting or opaque logic here.
     void evaluateEvent(const KhronicleEvent &event);
     void evaluateSnapshot(const SystemSnapshot &snapshot);
 

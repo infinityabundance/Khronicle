@@ -18,6 +18,8 @@ public:
     ~KhronicleStore();
 
     // Event and snapshot persistence API used by the daemon.
+    // INVARIANT: Facts precede interpretation.
+    // Store raw events/snapshots without altering their meaning.
     void addEvent(const KhronicleEvent &event);
     void addSnapshot(const SystemSnapshot &snapshot);
     HostIdentity getHostIdentity() const;

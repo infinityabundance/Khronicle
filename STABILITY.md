@@ -35,6 +35,13 @@ Khronicle follows semantic versioning with explicit meaning:
 Not every feature addition justifies a minor bump; changes should be grouped
 when possible to keep version churn low.
 
+## Semantic Guardrails
+
+- MAJOR changes require explicit acknowledgment of invariant changes and
+  migration documentation when compatibility is broken.
+- MINOR changes must preserve all invariants and meaning.
+- PATCH changes must not alter meaning or interpretation semantics.
+
 ## Deprecation Policy
 
 Deprecated features must:
@@ -46,4 +53,3 @@ Deprecated features must:
 There are no silent removals.
 
 See `EVOLUTION.md` for how future changes should be structured.
-
