@@ -56,3 +56,17 @@ systemctl --user enable --now khronicle-daemon.service
 ```bash
 systemctl --user enable --now khronicle-tray.service
 ```
+
+## Command-line reports
+
+Khronicle includes a small CLI tool `khronicle-report` for exporting reports.
+
+Examples:
+
+```bash
+# Timeline for last 24h in Markdown
+khronicle-report timeline --from "2026-01-28T00:00:00Z" --to "2026-01-29T00:00:00Z" --format markdown > report.md
+
+# Snapshot diff as JSON
+khronicle-report diff --snapshot-a "snapshot-123" --snapshot-b "snapshot-456" --format json > diff.json
+```
