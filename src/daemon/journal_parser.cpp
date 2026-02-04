@@ -27,7 +27,7 @@ QString toIsoSince(std::chrono::system_clock::time_point since)
     const auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(
                             since.time_since_epoch())
                             .count();
-    QDateTime dt = QDateTime::fromMSecsSinceEpoch(millis, Qt::UTC);
+    QDateTime dt = QDateTime::fromMSecsSinceEpoch(millis).toUTC();
     return dt.toString(Qt::ISODate);
 }
 
@@ -248,8 +248,8 @@ JournalParseResult parseJournalOutputLines(const QStringList &lines,
         const QString isoTimestamp = QDateTime::fromMSecsSinceEpoch(
                                          std::chrono::duration_cast<std::chrono::milliseconds>(
                                              timestamp->time_since_epoch())
-                                             .count(),
-                                         Qt::UTC)
+                                             .count())
+                                         .toUTC()
                                          .toString(Qt::ISODate);
 
         if (isFwupd) {

@@ -55,9 +55,9 @@ std::string formatLocalTime(std::chrono::system_clock::time_point timestamp)
     QDateTime dt = QDateTime::fromMSecsSinceEpoch(
         std::chrono::duration_cast<std::chrono::milliseconds>(
             timestamp.time_since_epoch())
-            .count(),
-        Qt::UTC);
-    dt = dt.toLocalTime();
+            .count())
+        .toUTC()
+        .toLocalTime();
     return dt.toString("yyyy-MM-dd HH:mm").toStdString();
 }
 
