@@ -18,6 +18,7 @@ private slots:
     void showSummaryPopup();
     void showWatchSignalsPopup();
     void openFullApp();
+    void showAboutDialog();
     void onTrayActivated(QSystemTrayIcon::ActivationReason reason);
 
 private:
@@ -26,6 +27,9 @@ private:
     QAction *m_refreshAction = nullptr;
     QAction *m_openAppAction = nullptr;
     QAction *m_watchSignalsAction = nullptr;
+    QAction *m_daemonStatusAction = nullptr;
+    QAction *m_startStopDaemonAction = nullptr;
+    QAction *m_aboutAction = nullptr;
     QAction *m_quitAction = nullptr;
     QTimer m_refreshTimer;
 
@@ -34,6 +38,7 @@ private:
     void setupTrayIcon();
     void setupMenu();
     void scheduleRefresh();
+    void updateDaemonActions();
 
     QString requestSummarySinceToday();
     int requestCriticalWatchSignalsSinceToday();

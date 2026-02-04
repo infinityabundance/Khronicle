@@ -8,6 +8,7 @@
 #include <QLocalSocket>
 #include <QProcess>
 #include <QIcon>
+#include <QMessageBox>
 #include <QTime>
 #include <QStringList>
 
@@ -16,6 +17,7 @@
 #include <nlohmann/json.hpp>
 
 #include "common/logging.hpp"
+#include "common/process_utils.hpp"
 
 namespace {
 
@@ -61,6 +63,21 @@ void KhronicleTray::setupTrayIcon()
 
 void KhronicleTray::setupMenu()
 {
+    m_daemonStatusAction = m_menu.addAction(QStringLiteral("Daemon: Unknown"));
+    m_daemonStatusAction->setEnabled(false);
+
+    m_startStopDaemonAction = m_menu.addAction(QStringLiteral("Start daemon"));
+    connect(m_startStopDaemonAction, &QAction::triggered, this, [this]() {
+        if (khronicle::isDaemonRunning()) {
+            khronicle::stopDaemon();
+        } else {
+            khronicle::startDaemon();
+        }
+        updateDaemonActions();
+    });
+
+    m_menu.addSeparator();
+
     auto *showAction = m_menu.addAction(QStringLiteral("Show Today's Changes"));
     connect(showAction, &QAction::triggered, this, &KhronicleTray::showSummaryPopup);
 
@@ -70,10 +87,13 @@ void KhronicleTray::setupMenu()
 
     m_menu.addSeparator();
 
-    m_openAppAction = m_menu.addAction(QStringLiteral("Open Khronicle..."));
+    m_openAppAction = m_menu.addAction(QStringLiteral("Open Khronicle UI"));
     connect(m_openAppAction, &QAction::triggered, this, &KhronicleTray::openFullApp);
 
     m_menu.addSeparator();
+
+    m_aboutAction = m_menu.addAction(QStringLiteral("About Khronicle"));
+    connect(m_aboutAction, &QAction::triggered, this, &KhronicleTray::showAboutDialog);
 
     m_refreshAction = m_menu.addAction(QStringLiteral("Refresh Now"));
     connect(m_refreshAction, &QAction::triggered, this, &KhronicleTray::refreshSummary);
@@ -91,6 +111,7 @@ void KhronicleTray::scheduleRefresh()
     m_refreshTimer.start();
 
     refreshSummary();
+    updateDaemonActions();
 }
 
 void KhronicleTray::refreshSummary()
@@ -111,6 +132,7 @@ void KhronicleTray::refreshSummary()
             .arg(criticalSignals);
     }
     m_trayIcon.setToolTip(QStringLiteral("Khronicle - ") + m_lastSummaryText);
+    updateDaemonActions();
 }
 
 void KhronicleTray::showSummaryPopup()
@@ -163,10 +185,33 @@ void KhronicleTray::openFullApp()
     QProcess::startDetached(QStringLiteral("khronicle"));
 }
 
+void KhronicleTray::showAboutDialog()
+{
+    QMessageBox box;
+    box.setWindowTitle(QStringLiteral("About Khronicle"));
+    box.setTextFormat(Qt::RichText);
+    box.setTextInteractionFlags(Qt::TextBrowserInteraction);
+    box.setStandardButtons(QMessageBox::Ok);
+    box.setText(QStringLiteral("<b>Khronicle</b><br/>"
+                               "System change chronicle for CachyOS/Arch-like systems.<br/>"
+                               "<a href=\"https://github.com/infinityabundance/Khronicle\">"
+                               "https://github.com/infinityabundance/Khronicle</a>"));
+    box.exec();
+}
+
 void KhronicleTray::onTrayActivated(QSystemTrayIcon::ActivationReason reason)
 {
-    if (reason == QSystemTrayIcon::Trigger
-        || reason == QSystemTrayIcon::DoubleClick) {
+    if (reason == QSystemTrayIcon::Trigger) {
+        KLOG_INFO(QStringLiteral("KhronicleTray"),
+                  QStringLiteral("onTrayActivated"),
+                  QStringLiteral("open_full_app"),
+                  QStringLiteral("tray_click"),
+                  QStringLiteral("process_start"),
+                  khronicle::logging::defaultWho(),
+                  QString(),
+                  nlohmann::json::object());
+        openFullApp();
+    } else if (reason == QSystemTrayIcon::DoubleClick) {
         showSummaryPopup();
     }
 }
@@ -387,4 +432,19 @@ QString KhronicleTray::socketPath() const
         return runtimeDir + QStringLiteral("/khronicle.sock");
     }
     return QStringLiteral("/run/user/%1/khronicle.sock").arg(getuid());
+}
+
+void KhronicleTray::updateDaemonActions()
+{
+    const bool running = khronicle::isDaemonRunning();
+    if (m_daemonStatusAction) {
+        m_daemonStatusAction->setText(
+            running ? QStringLiteral("Daemon: Running")
+                    : QStringLiteral("Daemon: Stopped"));
+    }
+    if (m_startStopDaemonAction) {
+        m_startStopDaemonAction->setText(
+            running ? QStringLiteral("Stop daemon")
+                    : QStringLiteral("Start daemon"));
+    }
 }

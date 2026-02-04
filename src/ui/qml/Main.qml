@@ -141,6 +141,17 @@ Kirigami.ApplicationWindow {
         }
     }
 
+    Timer {
+        interval: 5000
+        repeat: true
+        running: true
+        onTriggered: {
+            if (daemonController) {
+                daemonController.refreshDaemonStatus()
+            }
+        }
+    }
+
     globalDrawer: Kirigami.GlobalDrawer {
         title: "Khronicle"
         actions: [
@@ -151,6 +162,10 @@ Kirigami.ApplicationWindow {
             Kirigami.Action {
                 text: "Watchpoints"
                 onTriggered: root.pageStack.replace(watchpointsPageComponent)
+            },
+            Kirigami.Action {
+                text: "About"
+                onTriggered: aboutDialog.open()
             }
         ]
     }
@@ -163,6 +178,44 @@ Kirigami.ApplicationWindow {
         ColumnLayout {
             anchors.fill: parent
             spacing: Kirigami.Units.largeSpacing
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Kirigami.Units.smallSpacing
+
+                Kirigami.Label {
+                    text: daemonController && daemonController.daemonRunning
+                        ? "Daemon: Running"
+                        : "Daemon: Stopped"
+                }
+
+                Button {
+                    text: daemonController && daemonController.daemonRunning
+                        ? "Stop daemon"
+                        : "Start daemon"
+                    onClicked: {
+                        if (!daemonController) {
+                            return
+                        }
+                        if (daemonController.daemonRunning) {
+                            daemonController.stopDaemonFromUi()
+                        } else {
+                            daemonController.startDaemonFromUi()
+                        }
+                    }
+                }
+
+                Button {
+                    text: "Start tray"
+                    onClicked: {
+                        if (daemonController) {
+                            daemonController.startTrayFromUi()
+                        }
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+            }
 
             SummaryBar {
                 Layout.fillWidth: true
@@ -303,6 +356,24 @@ Kirigami.ApplicationWindow {
     Component {
         id: watchpointsPageComponent
         WatchpointsPage { }
+    }
+
+    Kirigami.Dialog {
+        id: aboutDialog
+        title: "About Khronicle"
+        standardButtons: Kirigami.Dialog.Ok
+        contentItem: ColumnLayout {
+            spacing: Kirigami.Units.smallSpacing
+            Kirigami.Heading { text: "Khronicle" }
+            Kirigami.Label {
+                text: "System change chronicle for CachyOS/Arch-like systems."
+                wrapMode: Text.Wrap
+            }
+            Kirigami.LinkButton {
+                text: "https://github.com/infinityabundance/Khronicle"
+                onClicked: Qt.openUrlExternally(text)
+            }
+        }
     }
 
     pageStack.initialPage: overviewPageComponent
