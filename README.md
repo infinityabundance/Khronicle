@@ -81,6 +81,27 @@ Khronicle offers temporal queries and explanations to help interpret change:
 
 Explanations describe temporal correlation and plausibility, not causation.
 
+## Watchpoints & Local Rules
+
+Khronicle supports watchpoints: declarative checks that highlight specific kinds
+of change (for example, kernel updates outside a maintenance window, firmware
+changes more than once per week, or GPU driver downgrades).
+
+What watchpoints are:
+
+- Local, inspectable rules over events and snapshots
+- Simple, transparent match criteria (category, risk level, package name)
+- Attention aids that surface signals when conditions are met
+
+What watchpoints are not:
+
+- No automatic blocking or remediation
+- No remote alerting or outbound network notifications
+- No system policy enforcement
+
+Manage watchpoints in the Khronicle UI under "Watchpoints" (Rules and Signals).
+Rules are stored locally and evaluated after events/snapshots are recorded.
+
 ## Multi-Host / Fleet Usage
 
 Khronicle supports offline, read-only aggregation across multiple hosts.

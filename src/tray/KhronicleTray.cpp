@@ -9,6 +9,7 @@
 #include <QProcess>
 #include <QIcon>
 #include <QTime>
+#include <QStringList>
 
 #include <unistd.h>
 
@@ -50,6 +51,10 @@ void KhronicleTray::setupMenu()
     auto *showAction = m_menu.addAction(QStringLiteral("Show Today's Changes"));
     connect(showAction, &QAction::triggered, this, &KhronicleTray::showSummaryPopup);
 
+    m_watchSignalsAction = m_menu.addAction(QStringLiteral("Show Watchpoint Signals"));
+    connect(m_watchSignalsAction, &QAction::triggered,
+            this, &KhronicleTray::showWatchSignalsPopup);
+
     m_menu.addSeparator();
 
     m_openAppAction = m_menu.addAction(QStringLiteral("Open Khronicle..."));
@@ -78,6 +83,11 @@ void KhronicleTray::scheduleRefresh()
 void KhronicleTray::refreshSummary()
 {
     m_lastSummaryText = requestSummarySinceToday();
+    const int criticalSignals = requestCriticalWatchSignalsSinceToday();
+    if (criticalSignals > 0) {
+        m_lastSummaryText += QStringLiteral(" (%1 critical watchpoint hit)")
+            .arg(criticalSignals);
+    }
     m_trayIcon.setToolTip(QStringLiteral("Khronicle - ") + m_lastSummaryText);
 }
 
@@ -89,6 +99,14 @@ void KhronicleTray::showSummaryPopup()
 
     m_trayIcon.showMessage(QStringLiteral("Khronicle - Today's Changes"),
                            m_lastSummaryText,
+                           QSystemTrayIcon::Information);
+}
+
+void KhronicleTray::showWatchSignalsPopup()
+{
+    const QString summary = requestWatchSignalsSinceToday();
+    m_trayIcon.showMessage(QStringLiteral("Khronicle - Watchpoint Signals"),
+                           summary,
                            QSystemTrayIcon::Information);
 }
 
@@ -179,6 +197,138 @@ QString KhronicleTray::requestSummarySinceToday()
     summary += QStringLiteral("; Total: ") + QString::number(totalEvents);
 
     return summary;
+}
+
+int KhronicleTray::requestCriticalWatchSignalsSinceToday()
+{
+    QLocalSocket socket;
+    socket.connectToServer(socketPath());
+    if (!socket.waitForConnected(kSocketTimeoutMs)) {
+        return 0;
+    }
+
+    const QDateTime now = QDateTime::currentDateTime();
+    const QDateTime midnight = QDateTime(now.date(), QTime(0, 0));
+
+    QJsonObject params;
+    params["since"] = toIso8601Utc(midnight);
+
+    QJsonObject root;
+    root["id"] = 1;
+    root["method"] = QStringLiteral("get_watch_signals_since");
+    root["params"] = params;
+
+    const QByteArray payload =
+        QJsonDocument(root).toJson(QJsonDocument::Compact) + '\n';
+
+    socket.write(payload);
+    if (!socket.waitForBytesWritten(kSocketTimeoutMs)) {
+        return 0;
+    }
+
+    if (!socket.waitForReadyRead(kSocketTimeoutMs)) {
+        return 0;
+    }
+
+    const QByteArray responseLine = socket.readLine();
+    if (responseLine.isEmpty()) {
+        return 0;
+    }
+
+    QJsonParseError parseError{};
+    const QJsonDocument doc = QJsonDocument::fromJson(responseLine, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+        return 0;
+    }
+
+    const QJsonObject obj = doc.object();
+    if (obj.contains("error")) {
+        return 0;
+    }
+
+    const QJsonObject result = obj.value("result").toObject();
+    const QJsonArray signals = result.value("signals").toArray();
+    int count = 0;
+    for (const auto &value : signals) {
+        const QJsonObject signal = value.toObject();
+        if (signal.value("severity").toString() == QStringLiteral("critical")) {
+            count++;
+        }
+    }
+    return count;
+}
+
+QString KhronicleTray::requestWatchSignalsSinceToday()
+{
+    QLocalSocket socket;
+    socket.connectToServer(socketPath());
+    if (!socket.waitForConnected(kSocketTimeoutMs)) {
+        return QStringLiteral("No watchpoint signals (daemon not running?)");
+    }
+
+    const QDateTime now = QDateTime::currentDateTime();
+    const QDateTime midnight = QDateTime(now.date(), QTime(0, 0));
+
+    QJsonObject params;
+    params["since"] = toIso8601Utc(midnight);
+
+    QJsonObject root;
+    root["id"] = 1;
+    root["method"] = QStringLiteral("get_watch_signals_since");
+    root["params"] = params;
+
+    const QByteArray payload =
+        QJsonDocument(root).toJson(QJsonDocument::Compact) + '\n';
+
+    socket.write(payload);
+    if (!socket.waitForBytesWritten(kSocketTimeoutMs)) {
+        return QStringLiteral("No watchpoint signals (daemon not running?)");
+    }
+
+    if (!socket.waitForReadyRead(kSocketTimeoutMs)) {
+        return QStringLiteral("No watchpoint signals (daemon not running?)");
+    }
+
+    const QByteArray responseLine = socket.readLine();
+    if (responseLine.isEmpty()) {
+        return QStringLiteral("No watchpoint signals (daemon not running?)");
+    }
+
+    QJsonParseError parseError{};
+    const QJsonDocument doc = QJsonDocument::fromJson(responseLine, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+        return QStringLiteral("No watchpoint signals (daemon not running?)");
+    }
+
+    const QJsonObject obj = doc.object();
+    if (obj.contains("error")) {
+        return QStringLiteral("No watchpoint signals (daemon not running?)");
+    }
+
+    const QJsonObject result = obj.value("result").toObject();
+    const QJsonArray signals = result.value("signals").toArray();
+    if (signals.isEmpty()) {
+        return QStringLiteral("No watchpoint signals today");
+    }
+
+    QStringList lines;
+    const int maxSignals = 5;
+    for (int i = signals.size() - 1; i >= 0 && lines.size() < maxSignals; --i) {
+        const QJsonObject signal = signals.at(i).toObject();
+        const QString timestamp = signal.value("timestamp").toString();
+        const QDateTime when = QDateTime::fromString(timestamp, Qt::ISODate);
+        const QString timeLabel = when.isValid()
+            ? when.toLocalTime().toString("HH:mm")
+            : QStringLiteral("??:??");
+        const QString ruleName = signal.value("ruleName").toString();
+        const QString severity = signal.value("severity").toString();
+        const QString message = signal.value("message").toString();
+
+        lines << QStringLiteral("%1 [%2] %3 - %4")
+            .arg(timeLabel, severity, ruleName, message);
+    }
+
+    return lines.join('\n');
 }
 
 QString KhronicleTray::socketPath() const

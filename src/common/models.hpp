@@ -53,4 +53,48 @@ struct KhronicleDiff {
     std::vector<ChangedField> changedFields;
 };
 
+enum class WatchScope {
+    Event,
+    Snapshot
+};
+
+enum class WatchSeverity {
+    Info,
+    Warning,
+    Critical
+};
+
+struct WatchRule {
+    std::string id;
+    std::string name;
+    std::string description;
+
+    WatchScope scope;
+    WatchSeverity severity;
+    bool enabled = true;
+
+    std::string categoryEquals;
+    std::string riskLevelAtLeast;
+    std::string packageNameContains;
+
+    std::string activeFrom;
+    std::string activeTo;
+
+    nlohmann::json extra;
+};
+
+struct WatchSignal {
+    std::string id;
+    std::chrono::system_clock::time_point timestamp;
+
+    std::string ruleId;
+    std::string ruleName;
+    WatchSeverity severity;
+
+    std::string originType;
+    std::string originId;
+
+    std::string message;
+};
+
 } // namespace khronicle

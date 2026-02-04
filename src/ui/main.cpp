@@ -8,6 +8,7 @@
 
 #include "ui/backend/KhronicleApiClient.hpp"
 #include "ui/backend/FleetModel.hpp"
+#include "ui/backend/WatchClient.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -27,6 +28,7 @@ int main(int argc, char *argv[])
     QUrl url;
     std::unique_ptr<khronicle::FleetModel> fleetModel;
     std::unique_ptr<khronicle::KhronicleApiClient> apiClient;
+    std::unique_ptr<khronicle::WatchClient> watchClient;
 
     if (parser.isSet(fleetOption)) {
         fleetModel = std::make_unique<khronicle::FleetModel>();
@@ -39,6 +41,9 @@ int main(int argc, char *argv[])
         apiClient = std::make_unique<khronicle::KhronicleApiClient>();
         engine.rootContext()->setContextProperty(QStringLiteral("khronicleApi"),
                                                  apiClient.get());
+        watchClient = std::make_unique<khronicle::WatchClient>();
+        engine.rootContext()->setContextProperty(QStringLiteral("watchClient"),
+                                                 watchClient.get());
         url = QUrl::fromLocalFile(
             QStringLiteral(KHRONICLE_QML_DIR "/Main.qml"));
     }

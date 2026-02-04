@@ -13,6 +13,7 @@
 namespace khronicle {
 
 class KhronicleApiServer;
+class WatchEngine;
 
 /**
  * KhronicleDaemon coordinates:
@@ -47,6 +48,7 @@ private:
 
     std::unique_ptr<KhronicleStore> m_store;
     std::unique_ptr<KhronicleApiServer> m_apiServer;
+    std::unique_ptr<WatchEngine> m_watchEngine;
 
     // In-memory cached state for faster access between cycles.
     std::optional<std::string> m_pacmanCursor;

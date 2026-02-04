@@ -15,6 +15,7 @@ public:
 private slots:
     void refreshSummary();
     void showSummaryPopup();
+    void showWatchSignalsPopup();
     void openFullApp();
     void onTrayActivated(QSystemTrayIcon::ActivationReason reason);
 
@@ -23,6 +24,7 @@ private:
     QMenu m_menu;
     QAction *m_refreshAction = nullptr;
     QAction *m_openAppAction = nullptr;
+    QAction *m_watchSignalsAction = nullptr;
     QAction *m_quitAction = nullptr;
     QTimer m_refreshTimer;
 
@@ -33,5 +35,7 @@ private:
     void scheduleRefresh();
 
     QString requestSummarySinceToday();
+    int requestCriticalWatchSignalsSinceToday();
+    QString requestWatchSignalsSinceToday();
     QString socketPath() const;
 };

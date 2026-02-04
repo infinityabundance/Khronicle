@@ -56,6 +56,34 @@ constexpr const char *kCreateHostIdentityTable =
     "    hardware TEXT"
     ");";
 
+constexpr const char *kCreateWatchRulesTable =
+    "CREATE TABLE IF NOT EXISTS watch_rules ("
+    "    id TEXT PRIMARY KEY,"
+    "    name TEXT NOT NULL,"
+    "    description TEXT,"
+    "    scope INTEGER NOT NULL,"
+    "    severity INTEGER NOT NULL,"
+    "    enabled INTEGER NOT NULL,"
+    "    category_equals TEXT,"
+    "    risk_level_at_least TEXT,"
+    "    package_name_contains TEXT,"
+    "    active_from TEXT,"
+    "    active_to TEXT,"
+    "    extra TEXT"
+    ");";
+
+constexpr const char *kCreateWatchSignalsTable =
+    "CREATE TABLE IF NOT EXISTS watch_signals ("
+    "    id TEXT PRIMARY KEY,"
+    "    timestamp INTEGER NOT NULL,"
+    "    rule_id TEXT NOT NULL,"
+    "    rule_name TEXT NOT NULL,"
+    "    severity INTEGER NOT NULL,"
+    "    origin_type TEXT NOT NULL,"
+    "    origin_id TEXT NOT NULL,"
+    "    message TEXT"
+    ");";
+
 class Statement {
 public:
     Statement(sqlite3 *db, const char *sql)
@@ -228,6 +256,28 @@ EventSource sourceFromInt(int value)
     }
 }
 
+WatchScope watchScopeFromInt(int value)
+{
+    switch (value) {
+    case 1:
+        return WatchScope::Snapshot;
+    default:
+        return WatchScope::Event;
+    }
+}
+
+WatchSeverity watchSeverityFromInt(int value)
+{
+    switch (value) {
+    case 1:
+        return WatchSeverity::Warning;
+    case 2:
+        return WatchSeverity::Critical;
+    default:
+        return WatchSeverity::Info;
+    }
+}
+
 } // namespace
 
 struct KhronicleStore::Impl {
@@ -252,6 +302,8 @@ KhronicleStore::KhronicleStore()
     execOrThrow(impl->db, kCreateSnapshotsTable);
     execOrThrow(impl->db, kCreateMetaTable);
     execOrThrow(impl->db, kCreateHostIdentityTable);
+    execOrThrow(impl->db, kCreateWatchRulesTable);
+    execOrThrow(impl->db, kCreateWatchSignalsTable);
 
     // Load or initialize host identity (stable per database).
     {
@@ -353,6 +405,119 @@ void KhronicleStore::addSnapshot(const SystemSnapshot &snapshot)
     if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
         throw std::runtime_error("failed to insert snapshot");
     }
+}
+
+std::vector<WatchRule> KhronicleStore::listWatchRules() const
+{
+    Statement stmt(impl->db,
+                   "SELECT id, name, description, scope, severity, enabled, "
+                   "category_equals, risk_level_at_least, package_name_contains, "
+                   "active_from, active_to, extra "
+                   "FROM watch_rules ORDER BY name ASC;");
+
+    std::vector<WatchRule> rules;
+    while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
+        WatchRule rule;
+        rule.id = columnText(stmt.get(), 0);
+        rule.name = columnText(stmt.get(), 1);
+        rule.description = columnText(stmt.get(), 2);
+        rule.scope = watchScopeFromInt(sqlite3_column_int(stmt.get(), 3));
+        rule.severity = watchSeverityFromInt(sqlite3_column_int(stmt.get(), 4));
+        rule.enabled = sqlite3_column_int(stmt.get(), 5) != 0;
+        rule.categoryEquals = columnText(stmt.get(), 6);
+        rule.riskLevelAtLeast = columnText(stmt.get(), 7);
+        rule.packageNameContains = columnText(stmt.get(), 8);
+        rule.activeFrom = columnText(stmt.get(), 9);
+        rule.activeTo = columnText(stmt.get(), 10);
+        rule.extra = columnJson(stmt.get(), 11);
+        rules.push_back(std::move(rule));
+    }
+
+    return rules;
+}
+
+void KhronicleStore::upsertWatchRule(const WatchRule &rule)
+{
+    Statement stmt(impl->db,
+                   "INSERT OR REPLACE INTO watch_rules ("
+                   "id, name, description, scope, severity, enabled, "
+                   "category_equals, risk_level_at_least, package_name_contains, "
+                   "active_from, active_to, extra"
+                   ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+    bindText(stmt.get(), 1, rule.id);
+    bindText(stmt.get(), 2, rule.name);
+    bindOptionalText(stmt.get(), 3, rule.description);
+    sqlite3_bind_int(stmt.get(), 4, static_cast<int>(rule.scope));
+    sqlite3_bind_int(stmt.get(), 5, static_cast<int>(rule.severity));
+    sqlite3_bind_int(stmt.get(), 6, rule.enabled ? 1 : 0);
+    bindOptionalText(stmt.get(), 7, rule.categoryEquals);
+    bindOptionalText(stmt.get(), 8, rule.riskLevelAtLeast);
+    bindOptionalText(stmt.get(), 9, rule.packageNameContains);
+    bindOptionalText(stmt.get(), 10, rule.activeFrom);
+    bindOptionalText(stmt.get(), 11, rule.activeTo);
+    bindJson(stmt.get(), 12, rule.extra);
+
+    if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
+        throw std::runtime_error("failed to upsert watch rule");
+    }
+}
+
+void KhronicleStore::deleteWatchRule(const std::string &id)
+{
+    Statement stmt(impl->db, "DELETE FROM watch_rules WHERE id = ?;");
+    bindText(stmt.get(), 1, id);
+
+    if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
+        throw std::runtime_error("failed to delete watch rule");
+    }
+}
+
+void KhronicleStore::addWatchSignal(const WatchSignal &signal)
+{
+    Statement stmt(impl->db,
+                   "INSERT OR REPLACE INTO watch_signals ("
+                   "id, timestamp, rule_id, rule_name, severity, "
+                   "origin_type, origin_id, message"
+                   ") VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
+    bindText(stmt.get(), 1, signal.id);
+    sqlite3_bind_int64(stmt.get(), 2, toEpochSeconds(signal.timestamp));
+    bindText(stmt.get(), 3, signal.ruleId);
+    bindText(stmt.get(), 4, signal.ruleName);
+    sqlite3_bind_int(stmt.get(), 5, static_cast<int>(signal.severity));
+    bindText(stmt.get(), 6, signal.originType);
+    bindText(stmt.get(), 7, signal.originId);
+    bindOptionalText(stmt.get(), 8, signal.message);
+
+    if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
+        throw std::runtime_error("failed to insert watch signal");
+    }
+}
+
+std::vector<WatchSignal> KhronicleStore::getWatchSignalsSince(
+    std::chrono::system_clock::time_point t) const
+{
+    Statement stmt(impl->db,
+                   "SELECT id, timestamp, rule_id, rule_name, severity, "
+                   "origin_type, origin_id, message "
+                   "FROM watch_signals WHERE timestamp >= ? "
+                   "ORDER BY timestamp ASC;");
+    sqlite3_bind_int64(stmt.get(), 1, toEpochSeconds(t));
+
+    std::vector<WatchSignal> signals;
+    while (sqlite3_step(stmt.get()) == SQLITE_ROW) {
+        WatchSignal signal;
+        signal.id = columnText(stmt.get(), 0);
+        signal.timestamp = fromEpochSeconds(sqlite3_column_int64(stmt.get(), 1));
+        signal.ruleId = columnText(stmt.get(), 2);
+        signal.ruleName = columnText(stmt.get(), 3);
+        signal.severity = watchSeverityFromInt(sqlite3_column_int(stmt.get(), 4));
+        signal.originType = columnText(stmt.get(), 5);
+        signal.originId = columnText(stmt.get(), 6);
+        signal.message = columnText(stmt.get(), 7);
+        signals.push_back(std::move(signal));
+    }
+
+    return signals;
 }
 
 std::vector<KhronicleEvent> KhronicleStore::getEventsSince(

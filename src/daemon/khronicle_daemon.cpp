@@ -9,6 +9,7 @@
 #include "daemon/journal_parser.hpp"
 #include "daemon/pacman_parser.hpp"
 #include "daemon/snapshot_builder.hpp"
+#include "daemon/watch_engine.hpp"
 #include "common/json_utils.hpp"
 
 #include <nlohmann/json.hpp>
@@ -62,6 +63,7 @@ KhronicleDaemon::KhronicleDaemon(QObject *parent)
     , m_store(std::make_unique<KhronicleStore>())
     , m_journalLastTimestamp(defaultJournalStart())
 {
+    m_watchEngine = std::make_unique<WatchEngine>(*m_store);
     loadStateFromMeta();
     loadLastSnapshotFromStore();
 }
@@ -100,6 +102,9 @@ void KhronicleDaemon::runPacmanIngestion()
     for (auto event : result.events) {
         event.hostId = hostId;
         m_store->addEvent(event);
+        if (m_watchEngine) {
+            m_watchEngine->evaluateEvent(event);
+        }
     }
 
     if (!result.newCursor.empty()) {
@@ -115,6 +120,9 @@ void KhronicleDaemon::runJournalIngestion()
     for (auto event : result.events) {
         event.hostId = hostId;
         m_store->addEvent(event);
+        if (m_watchEngine) {
+            m_watchEngine->evaluateEvent(event);
+        }
     }
 
     if (result.lastTimestamp > m_journalLastTimestamp) {
@@ -129,6 +137,9 @@ void KhronicleDaemon::runSnapshotCheck()
 
     if (!m_lastSnapshot.has_value()) {
         m_store->addSnapshot(current);
+        if (m_watchEngine) {
+            m_watchEngine->evaluateSnapshot(current);
+        }
         m_lastSnapshot = current;
         return;
     }
@@ -138,6 +149,9 @@ void KhronicleDaemon::runSnapshotCheck()
     }
 
     m_store->addSnapshot(current);
+    if (m_watchEngine) {
+        m_watchEngine->evaluateSnapshot(current);
+    }
 
     KhronicleEvent event;
     event.id = "kernel-change-"
@@ -159,6 +173,9 @@ void KhronicleDaemon::runSnapshotCheck()
     event.hostId = current.hostIdentity.hostId;
 
     m_store->addEvent(event);
+    if (m_watchEngine) {
+        m_watchEngine->evaluateEvent(event);
+    }
     m_lastSnapshot = current;
 }
 

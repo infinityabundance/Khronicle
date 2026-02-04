@@ -79,6 +79,49 @@ inline std::string toSourceString(EventSource source)
     return "other";
 }
 
+inline std::string toWatchScopeString(WatchScope scope)
+{
+    switch (scope) {
+    case WatchScope::Event:
+        return "event";
+    case WatchScope::Snapshot:
+        return "snapshot";
+    }
+    return "event";
+}
+
+inline std::string toWatchSeverityString(WatchSeverity severity)
+{
+    switch (severity) {
+    case WatchSeverity::Info:
+        return "info";
+    case WatchSeverity::Warning:
+        return "warning";
+    case WatchSeverity::Critical:
+        return "critical";
+    }
+    return "info";
+}
+
+inline WatchScope parseWatchScopeString(const std::string &value)
+{
+    if (value == "snapshot") {
+        return WatchScope::Snapshot;
+    }
+    return WatchScope::Event;
+}
+
+inline WatchSeverity parseWatchSeverityString(const std::string &value)
+{
+    if (value == "warning") {
+        return WatchSeverity::Warning;
+    }
+    if (value == "critical") {
+        return WatchSeverity::Critical;
+    }
+    return WatchSeverity::Info;
+}
+
 inline EventCategory parseCategoryString(const std::string &value)
 {
     if (value == "kernel") {
@@ -117,6 +160,34 @@ inline EventSource parseSourceString(const std::string &value)
         return EventSource::Other;
     }
     return EventSource::Other;
+}
+
+inline void to_json(nlohmann::json &j, const WatchScope &scope)
+{
+    j = toWatchScopeString(scope);
+}
+
+inline void from_json(const nlohmann::json &j, WatchScope &scope)
+{
+    if (j.is_string()) {
+        scope = parseWatchScopeString(j.get<std::string>());
+    } else {
+        scope = WatchScope::Event;
+    }
+}
+
+inline void to_json(nlohmann::json &j, const WatchSeverity &severity)
+{
+    j = toWatchSeverityString(severity);
+}
+
+inline void from_json(const nlohmann::json &j, WatchSeverity &severity)
+{
+    if (j.is_string()) {
+        severity = parseWatchSeverityString(j.get<std::string>());
+    } else {
+        severity = WatchSeverity::Info;
+    }
 }
 
 inline void to_json(nlohmann::json &j, const EventCategory &category)
@@ -295,6 +366,82 @@ inline void from_json(const nlohmann::json &j, KhronicleDiff &diff)
     } else {
         diff.changedFields.clear();
     }
+}
+
+inline void to_json(nlohmann::json &j, const WatchRule &rule)
+{
+    j = nlohmann::json{
+        {"id", rule.id},
+        {"name", rule.name},
+        {"description", rule.description},
+        {"scope", rule.scope},
+        {"severity", rule.severity},
+        {"enabled", rule.enabled},
+        {"categoryEquals", rule.categoryEquals},
+        {"riskLevelAtLeast", rule.riskLevelAtLeast},
+        {"packageNameContains", rule.packageNameContains},
+        {"activeFrom", rule.activeFrom},
+        {"activeTo", rule.activeTo},
+        {"extra", rule.extra}
+    };
+}
+
+inline void from_json(const nlohmann::json &j, WatchRule &rule)
+{
+    rule.id = j.value("id", "");
+    rule.name = j.value("name", "");
+    rule.description = j.value("description", "");
+    if (j.contains("scope")) {
+        rule.scope = j.at("scope").get<WatchScope>();
+    } else {
+        rule.scope = WatchScope::Event;
+    }
+    if (j.contains("severity")) {
+        rule.severity = j.at("severity").get<WatchSeverity>();
+    } else {
+        rule.severity = WatchSeverity::Info;
+    }
+    rule.enabled = j.value("enabled", true);
+    rule.categoryEquals = j.value("categoryEquals", "");
+    rule.riskLevelAtLeast = j.value("riskLevelAtLeast", "");
+    rule.packageNameContains = j.value("packageNameContains", "");
+    rule.activeFrom = j.value("activeFrom", "");
+    rule.activeTo = j.value("activeTo", "");
+    if (j.contains("extra")) {
+        rule.extra = j.at("extra");
+    } else {
+        rule.extra = nlohmann::json::object();
+    }
+}
+
+inline void to_json(nlohmann::json &j, const WatchSignal &signal)
+{
+    j = nlohmann::json{
+        {"id", signal.id},
+        {"timestamp", toIso8601Utc(signal.timestamp)},
+        {"ruleId", signal.ruleId},
+        {"ruleName", signal.ruleName},
+        {"severity", signal.severity},
+        {"originType", signal.originType},
+        {"originId", signal.originId},
+        {"message", signal.message}
+    };
+}
+
+inline void from_json(const nlohmann::json &j, WatchSignal &signal)
+{
+    signal.id = j.value("id", "");
+    signal.timestamp = fromIso8601Utc(j.value("timestamp", ""));
+    signal.ruleId = j.value("ruleId", "");
+    signal.ruleName = j.value("ruleName", "");
+    if (j.contains("severity")) {
+        signal.severity = j.at("severity").get<WatchSeverity>();
+    } else {
+        signal.severity = WatchSeverity::Info;
+    }
+    signal.originType = j.value("originType", "");
+    signal.originId = j.value("originId", "");
+    signal.message = j.value("message", "");
 }
 
 } // namespace khronicle

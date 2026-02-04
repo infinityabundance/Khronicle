@@ -20,6 +20,7 @@ add_executable(khronicle-daemon
     src/daemon/change_explainer.cpp
     src/daemon/counterfactual.cpp
     src/daemon/khronicle_daemon.cpp
+    src/daemon/watch_engine.cpp
 )
 
 target_include_directories(khronicle-daemon
@@ -39,6 +40,7 @@ add_executable(khronicle
     src/ui/main.cpp
     src/ui/backend/KhronicleApiClient.cpp
     src/ui/backend/FleetModel.cpp
+    src/ui/backend/WatchClient.cpp
 )
 
 target_include_directories(khronicle
