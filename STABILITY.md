@@ -1,7 +1,4 @@
-# Stability Guarantees
-
-This document defines what users and developers can rely on. If any of these
-change, it is considered a breaking change.
+# Stability
 
 ## Stability Tiers
 
