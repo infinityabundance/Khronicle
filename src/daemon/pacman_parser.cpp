@@ -310,6 +310,8 @@ PacmanParseResult parsePacmanLog(const std::string &path,
         event.details = line;
         event.beforeState = nlohmann::json::object();
         event.afterState = nlohmann::json::object();
+        event.riskLevel = "info";
+        event.riskReason.clear();
         if (!oldVersion.empty()) {
             event.beforeState["version"] = oldVersion;
         }

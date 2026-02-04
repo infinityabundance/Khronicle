@@ -9,6 +9,7 @@
 #include "daemon/khronicle_api_server.hpp"
 #include "daemon/journal_parser.hpp"
 #include "daemon/pacman_parser.hpp"
+#include "daemon/risk_classifier.hpp"
 #include "daemon/snapshot_builder.hpp"
 #include "common/json_utils.hpp"
 #include "common/khronicle_version.hpp"
@@ -125,7 +126,8 @@ void KhronicleDaemon::runPacmanIngestion()
     const PacmanParseResult result =
         parsePacmanLog("/var/log/pacman.log", m_pacmanCursor);
 
-    for (const auto &event : result.events) {
+    for (auto event : result.events) {
+        RiskClassifier::classify(event);
         m_store->addEvent(event);
     }
 
@@ -169,7 +171,8 @@ void KhronicleDaemon::runJournalIngestion()
     const auto previousTimestamp = m_journalLastTimestamp;
     const JournalParseResult result = parseJournalSince(m_journalLastTimestamp);
 
-    for (const auto &event : result.events) {
+    for (auto event : result.events) {
+        RiskClassifier::classify(event);
         m_store->addEvent(event);
     }
 
@@ -233,7 +236,10 @@ void KhronicleDaemon::runSnapshotCheck()
     event.beforeState["kernelVersion"] = m_lastSnapshot->kernelVersion;
     event.afterState["kernelVersion"] = current.kernelVersion;
     event.relatedPackages = {detectKernelPackage(current)};
+    event.riskLevel = "info";
+    event.riskReason.clear();
 
+    RiskClassifier::classify(event);
     m_store->addEvent(event);
     m_lastSnapshot = current;
 }

@@ -236,6 +236,13 @@ QVariantList KhronicleApiClient::convertEventsJsonToVariantList(
             event["relatedPackages"] = related;
         }
 
+        if (obj.contains("riskLevel")) {
+            event["riskLevel"] = obj.value("riskLevel").toString();
+        }
+        if (obj.contains("riskReason")) {
+            event["riskReason"] = obj.value("riskReason").toString();
+        }
+
         events.push_back(event);
     }
 

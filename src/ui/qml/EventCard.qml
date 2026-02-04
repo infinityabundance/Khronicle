@@ -62,6 +62,19 @@ Kirigami.AbstractListItem {
                     spacing: Kirigami.Units.smallSpacing
 
                     Kirigami.Label {
+                        visible: (root.eventData.riskLevel || "") === "critical"
+                        text: "Critical"
+                        font.bold: true
+                        opacity: 0.9
+                    }
+
+                    Kirigami.Label {
+                        visible: (root.eventData.riskLevel || "") === "important"
+                        text: "Important"
+                        opacity: 0.8
+                    }
+
+                    Kirigami.Label {
                         text: root.eventData.summary || ""
                         Layout.fillWidth: true
                         wrapMode: Text.Wrap
@@ -79,6 +92,14 @@ Kirigami.AbstractListItem {
                     wrapMode: Text.Wrap
                     opacity: 0.7
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize * 0.9
+                }
+
+                Kirigami.Label {
+                    visible: (root.eventData.riskReason || "").length > 0
+                    text: "Risk: " + (root.eventData.riskReason || "")
+                    wrapMode: Text.Wrap
+                    opacity: 0.6
+                    font.pointSize: Kirigami.Theme.defaultFont.pointSize * 0.85
                 }
             }
         }

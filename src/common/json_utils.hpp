@@ -158,7 +158,9 @@ inline void to_json(nlohmann::json &j, const KhronicleEvent &event)
         {"details", event.details},
         {"beforeState", event.beforeState},
         {"afterState", event.afterState},
-        {"relatedPackages", event.relatedPackages}
+        {"relatedPackages", event.relatedPackages},
+        {"riskLevel", event.riskLevel.empty() ? "info" : event.riskLevel},
+        {"riskReason", event.riskReason}
     };
 }
 
@@ -193,6 +195,8 @@ inline void from_json(const nlohmann::json &j, KhronicleEvent &event)
     } else {
         event.relatedPackages.clear();
     }
+    event.riskLevel = j.value("riskLevel", "info");
+    event.riskReason = j.value("riskReason", "");
 }
 
 inline void to_json(nlohmann::json &j, const SystemSnapshot &snapshot)

@@ -254,6 +254,9 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             bool kernelChanged = false;
             std::string kernelFrom;
             std::string kernelTo;
+            int riskInfo = 0;
+            int riskImportant = 0;
+            int riskCritical = 0;
 
             for (const auto &event : events) {
                 switch (event.category) {
@@ -278,6 +281,16 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
                 default:
                     break;
                 }
+
+                const std::string level =
+                    event.riskLevel.empty() ? "info" : event.riskLevel;
+                if (level == "critical") {
+                    riskCritical++;
+                } else if (level == "important") {
+                    riskImportant++;
+                } else {
+                    riskInfo++;
+                }
             }
 
             nlohmann::json result;
@@ -287,6 +300,11 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
             result["gpuEvents"] = gpuEvents;
             result["firmwareEvents"] = firmwareEvents;
             result["totalEvents"] = static_cast<int>(events.size());
+            result["riskCounts"] = {
+                {"info", riskInfo},
+                {"important", riskImportant},
+                {"critical", riskCritical},
+            };
 
             const QByteArray response = makeResultResponse(result, id);
             socket->write(response);

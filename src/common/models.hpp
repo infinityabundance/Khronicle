@@ -20,6 +20,8 @@ struct KhronicleEvent {
     nlohmann::json beforeState;
     nlohmann::json afterState;
     std::vector<std::string> relatedPackages;
+    std::string riskLevel;
+    std::string riskReason;
 };
 
 struct SystemSnapshot {

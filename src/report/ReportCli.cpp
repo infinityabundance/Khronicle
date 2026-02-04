@@ -71,10 +71,14 @@ void renderTimelineMarkdown(const std::vector<KhronicleEvent> &events,
     for (const auto &event : events) {
         std::cout << "- [" << formatLocalTime(event.timestamp) << "] ("
                   << toCategoryString(event.category) << ", "
-                  << toSourceString(event.source) << ") "
+                  << toSourceString(event.source) << ", "
+                  << (event.riskLevel.empty() ? "info" : event.riskLevel) << ") "
                   << event.summary << "\n";
         if (!event.details.empty()) {
             std::cout << "  - details: " << event.details << "\n";
+        }
+        if (!event.riskReason.empty()) {
+            std::cout << "  - risk: " << event.riskReason << "\n";
         }
     }
 }

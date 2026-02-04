@@ -24,7 +24,9 @@ constexpr const char *kCreateEventsTable =
     "    details TEXT,"
     "    before_state TEXT,"
     "    after_state TEXT,"
-    "    related_packages TEXT"
+    "    related_packages TEXT,"
+    "    risk_level TEXT DEFAULT 'info',"
+    "    risk_reason TEXT"
     ");";
 
 constexpr const char *kCreateSnapshotsTable =
@@ -89,6 +91,26 @@ void execOrThrow(sqlite3 *db, const char *sql)
         sqlite3_free(error);
         throw std::runtime_error(message);
     }
+}
+
+bool columnExists(sqlite3 *db, const std::string &table, const std::string &column)
+{
+    const std::string sql = "PRAGMA table_info(" + table + ");";
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+        return false;
+    }
+
+    bool found = false;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *name = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
+        if (name && column == name) {
+            found = true;
+            break;
+        }
+    }
+    sqlite3_finalize(stmt);
+    return found;
 }
 
 void bindText(sqlite3_stmt *stmt, int index, const std::string &value)
@@ -176,6 +198,7 @@ EventSource sourceFromInt(int value)
 
 struct KhronicleStore::Impl {
     sqlite3 *db = nullptr;
+    bool hasRiskColumns = false;
 };
 
 KhronicleStore::KhronicleStore()
@@ -194,6 +217,36 @@ KhronicleStore::KhronicleStore()
     execOrThrow(impl->db, kCreateEventsTable);
     execOrThrow(impl->db, kCreateSnapshotsTable);
     execOrThrow(impl->db, kCreateMetaTable);
+
+    impl->hasRiskColumns = columnExists(impl->db, "events", "risk_level");
+    if (!impl->hasRiskColumns) {
+        try {
+            execOrThrow(impl->db,
+                        "ALTER TABLE events ADD COLUMN risk_level TEXT DEFAULT 'info';");
+            execOrThrow(impl->db,
+                        "ALTER TABLE events ADD COLUMN risk_reason TEXT;");
+            impl->hasRiskColumns = true;
+        } catch (const std::exception &) {
+            impl->hasRiskColumns = false;
+        }
+    } else {
+        const bool hasReason = columnExists(impl->db, "events", "risk_reason");
+        if (!hasReason) {
+            try {
+                execOrThrow(impl->db,
+                            "ALTER TABLE events ADD COLUMN risk_reason TEXT;");
+                impl->hasRiskColumns = true;
+            } catch (const std::exception &) {
+                impl->hasRiskColumns = false;
+            }
+        } else {
+            impl->hasRiskColumns = true;
+        }
+    }
+
+    if (!impl->hasRiskColumns) {
+        std::cerr << "Khronicle: risk columns unavailable; defaulting risk metadata.\n";
+    }
 }
 
 KhronicleStore::~KhronicleStore()
@@ -220,10 +273,20 @@ void KhronicleStore::addEvent(const KhronicleEvent &event)
         return;
     }
 
-    Statement stmt(impl->db,
-                   "INSERT OR REPLACE INTO events (id, timestamp, category, "
-                   "source, summary, details, before_state, after_state, "
-                   "related_packages) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);");
+    std::string sql =
+        "INSERT OR REPLACE INTO events (id, timestamp, category, "
+        "source, summary, details, before_state, after_state, "
+        "related_packages";
+    if (impl->hasRiskColumns) {
+        sql += ", risk_level, risk_reason";
+    }
+    sql += ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?";
+    if (impl->hasRiskColumns) {
+        sql += ", ?, ?";
+    }
+    sql += ");";
+
+    Statement stmt(impl->db, sql.c_str());
     bindText(stmt.get(), 1, event.id);
     sqlite3_bind_int64(stmt.get(), 2, toEpochSeconds(event.timestamp));
     sqlite3_bind_int(stmt.get(), 3, static_cast<int>(event.category));
@@ -233,6 +296,10 @@ void KhronicleStore::addEvent(const KhronicleEvent &event)
     bindJson(stmt.get(), 7, event.beforeState);
     bindJson(stmt.get(), 8, event.afterState);
     bindJson(stmt.get(), 9, nlohmann::json(event.relatedPackages));
+    if (impl->hasRiskColumns) {
+        bindText(stmt.get(), 10, event.riskLevel.empty() ? "info" : event.riskLevel);
+        bindOptionalText(stmt.get(), 11, event.riskReason);
+    }
 
     if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
         throw std::runtime_error("failed to insert event");
@@ -260,10 +327,14 @@ void KhronicleStore::addSnapshot(const SystemSnapshot &snapshot)
 std::vector<KhronicleEvent> KhronicleStore::getEventsSince(
     std::chrono::system_clock::time_point since) const
 {
-    Statement stmt(impl->db,
-                   "SELECT id, timestamp, category, source, summary, details, "
-                   "before_state, after_state, related_packages "
-                   "FROM events WHERE timestamp >= ? ORDER BY timestamp ASC;");
+    std::string sql =
+        "SELECT id, timestamp, category, source, summary, details, "
+        "before_state, after_state, related_packages";
+    if (impl->hasRiskColumns) {
+        sql += ", risk_level, risk_reason";
+    }
+    sql += " FROM events WHERE timestamp >= ? ORDER BY timestamp ASC;";
+    Statement stmt(impl->db, sql.c_str());
     sqlite3_bind_int64(stmt.get(), 1, toEpochSeconds(since));
 
     std::vector<KhronicleEvent> events;
@@ -281,6 +352,16 @@ std::vector<KhronicleEvent> KhronicleStore::getEventsSince(
         if (related.is_array()) {
             event.relatedPackages = related.get<std::vector<std::string>>();
         }
+        if (impl->hasRiskColumns) {
+            event.riskLevel = columnText(stmt.get(), 9);
+            event.riskReason = columnText(stmt.get(), 10);
+            if (event.riskLevel.empty()) {
+                event.riskLevel = "info";
+            }
+        } else {
+            event.riskLevel = "info";
+            event.riskReason.clear();
+        }
         events.push_back(std::move(event));
     }
 
@@ -291,11 +372,15 @@ std::vector<KhronicleEvent> KhronicleStore::getEventsBetween(
     std::chrono::system_clock::time_point from,
     std::chrono::system_clock::time_point to) const
 {
-    Statement stmt(impl->db,
-                   "SELECT id, timestamp, category, source, summary, details, "
-                   "before_state, after_state, related_packages "
-                   "FROM events WHERE timestamp >= ? AND timestamp <= ? "
-                   "ORDER BY timestamp ASC;");
+    std::string sql =
+        "SELECT id, timestamp, category, source, summary, details, "
+        "before_state, after_state, related_packages";
+    if (impl->hasRiskColumns) {
+        sql += ", risk_level, risk_reason";
+    }
+    sql += " FROM events WHERE timestamp >= ? AND timestamp <= ? "
+           "ORDER BY timestamp ASC;";
+    Statement stmt(impl->db, sql.c_str());
     sqlite3_bind_int64(stmt.get(), 1, toEpochSeconds(from));
     sqlite3_bind_int64(stmt.get(), 2, toEpochSeconds(to));
 
@@ -313,6 +398,16 @@ std::vector<KhronicleEvent> KhronicleStore::getEventsBetween(
         nlohmann::json related = columnJson(stmt.get(), 8);
         if (related.is_array()) {
             event.relatedPackages = related.get<std::vector<std::string>>();
+        }
+        if (impl->hasRiskColumns) {
+            event.riskLevel = columnText(stmt.get(), 9);
+            event.riskReason = columnText(stmt.get(), 10);
+            if (event.riskLevel.empty()) {
+                event.riskLevel = "info";
+            }
+        } else {
+            event.riskLevel = "info";
+            event.riskReason.clear();
         }
         events.push_back(std::move(event));
     }

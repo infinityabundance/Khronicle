@@ -87,3 +87,13 @@ Debugging tips:
 Check daemon logs for warnings
 Use `khronicle-report` for exports
 Query `get_daemon_status` via the local JSON-RPC socket for diagnostics
+
+## Risk & Anomaly Tags
+
+Khronicle applies transparent, rule-based risk tagging to events:
+
+- `info`: normal updates and routine changes
+- `important`: GPU driver or firmware updates, package downgrades
+- `critical`: kernel version changes
+
+Risk metadata is included in JSON exports and surfaced in the timeline UI.

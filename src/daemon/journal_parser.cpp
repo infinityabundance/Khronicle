@@ -202,6 +202,8 @@ JournalParseResult parseJournalSince(std::chrono::system_clock::time_point since
         event.beforeState = nlohmann::json::object();
         event.afterState = nlohmann::json::object();
         event.details = line.toStdString();
+        event.riskLevel = "info";
+        event.riskReason.clear();
 
         const QString isoTimestamp = QDateTime::fromMSecsSinceEpoch(
                                          std::chrono::duration_cast<std::chrono::milliseconds>(
