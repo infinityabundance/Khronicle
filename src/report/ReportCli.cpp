@@ -9,6 +9,7 @@
 #include "common/json_utils.hpp"
 #include "common/models.hpp"
 #include "daemon/khronicle_store.hpp"
+#include "daemon/counterfactual.hpp"
 
 namespace khronicle {
 
@@ -19,7 +20,8 @@ QString usageText()
     return QStringLiteral(
         "Usage:\n"
         "  khronicle-report timeline --from ISO --to ISO [--format markdown|json]\n"
-        "  khronicle-report diff --snapshot-a ID --snapshot-b ID [--format markdown|json]\n");
+        "  khronicle-report diff --snapshot-a ID --snapshot-b ID [--format markdown|json]\n"
+        "  khronicle-report explain --from ISO --to ISO [--format markdown|json]\n");
 }
 
 QString humanizePath(const std::string &path)
@@ -187,6 +189,9 @@ int ReportCli::run(int argc, char *argv[])
     if (command == QStringLiteral("diff")) {
         return runDiffReport(args);
     }
+    if (command == QStringLiteral("explain")) {
+        return runExplainReport(args);
+    }
 
     std::cerr << usageText().toStdString();
     return 1;
@@ -259,6 +264,61 @@ int ReportCli::runDiffReport(const QStringList &args)
         renderDiffJson(diff, &*snapshotA, &*snapshotB);
     } else {
         renderDiffMarkdown(diff, &*snapshotA, &*snapshotB);
+    }
+
+    return 0;
+}
+
+int ReportCli::runExplainReport(const QStringList &args)
+{
+    const QString fromValue = getArgValue(args, QStringLiteral("--from"));
+    const QString toValue = getArgValue(args, QStringLiteral("--to"));
+
+    if (fromValue.isEmpty() || toValue.isEmpty()) {
+        std::cerr << usageText().toStdString();
+        return 1;
+    }
+
+    const auto from = parseIso8601(fromValue);
+    const auto to = parseIso8601(toValue);
+    if (!from.has_value() || !to.has_value()) {
+        std::cerr << "Invalid ISO8601 timestamp." << std::endl;
+        return 1;
+    }
+
+    const QString format = getFormat(args);
+    if (format != QStringLiteral("markdown") && format != QStringLiteral("json")) {
+        std::cerr << "Invalid format. Use markdown or json." << std::endl;
+        return 1;
+    }
+
+    KhronicleStore store;
+    const auto baseline = store.getSnapshotBefore(*from);
+    const auto comparison = store.getSnapshotAfter(*to);
+
+    if (!baseline.has_value() || !comparison.has_value()) {
+        std::cerr << "Snapshots not found." << std::endl;
+        return 1;
+    }
+
+    const auto events = store.getEventsBetween(*from, *to);
+    const auto result = computeCounterfactual(*baseline, *comparison, events);
+
+    if (format == QStringLiteral("json")) {
+        nlohmann::json payload;
+        payload["baselineSnapshot"] = result.baselineSnapshotId;
+        payload["comparisonSnapshot"] = result.comparisonSnapshotId;
+        payload["summary"] = result.explanationSummary;
+        payload["diff"] = result.diff;
+        std::cout << payload.dump(2) << std::endl;
+    } else {
+        std::cout << "# Change Explanation\n\n";
+        std::cout << "Between " << toIso8601Utc(*from) << " and "
+                  << toIso8601Utc(*to) << ":\n\n";
+        for (const auto &field : result.diff.changedFields) {
+            std::cout << "- " << field.path << "\n";
+        }
+        std::cout << "\n" << result.explanationSummary << "\n";
     }
 
     return 0;

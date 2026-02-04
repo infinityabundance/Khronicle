@@ -351,6 +351,54 @@ std::optional<SystemSnapshot> KhronicleStore::getSnapshot(
     return snapshot;
 }
 
+std::optional<SystemSnapshot> KhronicleStore::getSnapshotBefore(
+    std::chrono::system_clock::time_point t) const
+{
+    Statement stmt(impl->db,
+                   "SELECT id, timestamp, kernel_version, gpu_driver, "
+                   "firmware_versions, key_packages "
+                   "FROM snapshots WHERE timestamp <= ? "
+                   "ORDER BY timestamp DESC LIMIT 1;");
+    sqlite3_bind_int64(stmt.get(), 1, toEpochSeconds(t));
+
+    if (sqlite3_step(stmt.get()) != SQLITE_ROW) {
+        return std::nullopt;
+    }
+
+    SystemSnapshot snapshot;
+    snapshot.id = columnText(stmt.get(), 0);
+    snapshot.timestamp = fromEpochSeconds(sqlite3_column_int64(stmt.get(), 1));
+    snapshot.kernelVersion = columnText(stmt.get(), 2);
+    snapshot.gpuDriver = columnJson(stmt.get(), 3);
+    snapshot.firmwareVersions = columnJson(stmt.get(), 4);
+    snapshot.keyPackages = columnJson(stmt.get(), 5);
+    return snapshot;
+}
+
+std::optional<SystemSnapshot> KhronicleStore::getSnapshotAfter(
+    std::chrono::system_clock::time_point t) const
+{
+    Statement stmt(impl->db,
+                   "SELECT id, timestamp, kernel_version, gpu_driver, "
+                   "firmware_versions, key_packages "
+                   "FROM snapshots WHERE timestamp >= ? "
+                   "ORDER BY timestamp ASC LIMIT 1;");
+    sqlite3_bind_int64(stmt.get(), 1, toEpochSeconds(t));
+
+    if (sqlite3_step(stmt.get()) != SQLITE_ROW) {
+        return std::nullopt;
+    }
+
+    SystemSnapshot snapshot;
+    snapshot.id = columnText(stmt.get(), 0);
+    snapshot.timestamp = fromEpochSeconds(sqlite3_column_int64(stmt.get(), 1));
+    snapshot.kernelVersion = columnText(stmt.get(), 2);
+    snapshot.gpuDriver = columnJson(stmt.get(), 3);
+    snapshot.firmwareVersions = columnJson(stmt.get(), 4);
+    snapshot.keyPackages = columnJson(stmt.get(), 5);
+    return snapshot;
+}
+
 KhronicleDiff KhronicleStore::diffSnapshots(const std::string &aId,
                                             const std::string &bId) const
 {

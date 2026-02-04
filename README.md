@@ -70,3 +70,13 @@ khronicle-report timeline --from "2026-01-28T00:00:00Z" --to "2026-01-29T00:00:0
 # Snapshot diff as JSON
 khronicle-report diff --snapshot-a "snapshot-123" --snapshot-b "snapshot-456" --format json > diff.json
 ```
+
+## Temporal Reasoning & Interpretation
+
+Khronicle offers temporal queries and explanations to help interpret change:
+
+- Recorded facts: events and snapshots at specific times
+- Derived diffs: comparisons between snapshots or ranges
+- Interpretive explanations: text summaries of likely contributors
+
+Explanations describe temporal correlation and plausibility, not causation.

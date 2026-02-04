@@ -24,6 +24,7 @@ Kirigami.ApplicationWindow {
     property var summaryData: ({})
     property var snapshotsModel: []
     property var diffModel: []
+    property string explanationText: ""
 
     function applyFilters() {
         if (!root.rawEventsModel) {
@@ -131,6 +132,9 @@ Kirigami.ApplicationWindow {
         }
         function onDiffLoaded(diffRows) {
             root.diffModel = diffRows
+        }
+        function onExplanationLoaded(summary) {
+            root.explanationText = summary
         }
         function onErrorOccurred(message) {
             console.warn("Khronicle API error:", message)
@@ -247,6 +251,28 @@ Kirigami.ApplicationWindow {
                 snapshots: root.snapshotsModel
                 onCompareRequested: function(snapshotAId, snapshotBId) {
                     khronicleApi.loadDiff(snapshotAId, snapshotBId)
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Kirigami.Units.smallSpacing
+
+                Button {
+                    text: "Explain this change"
+                    enabled: root.currentFromDate !== null && root.currentToDate !== null
+                    onClicked: {
+                        root.explanationText = ""
+                        khronicleApi.loadExplanationBetween(root.currentFromDate,
+                                                           root.currentToDate)
+                    }
+                }
+
+                Kirigami.Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    text: root.explanationText
+                    visible: root.explanationText.length > 0
                 }
             }
 

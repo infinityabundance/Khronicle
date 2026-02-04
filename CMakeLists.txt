@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Kirigami2)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Kirigami2 Test)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(SQLite3 REQUIRED)
 
@@ -17,6 +17,8 @@ add_executable(khronicle-daemon
     src/daemon/journal_parser.cpp
     src/daemon/snapshot_builder.cpp
     src/daemon/khronicle_api_server.cpp
+    src/daemon/change_explainer.cpp
+    src/daemon/counterfactual.cpp
     src/daemon/khronicle_daemon.cpp
 )
 
@@ -78,9 +80,14 @@ target_link_libraries(khronicle-tray
         Qt6::Widgets
 )
 
+enable_testing()
+add_subdirectory(tests)
+
 add_executable(khronicle-report
     src/report/main.cpp
     src/report/ReportCli.cpp
+    src/daemon/change_explainer.cpp
+    src/daemon/counterfactual.cpp
 )
 
 target_include_directories(khronicle-report
