@@ -74,7 +74,12 @@ int main(int argc, char *argv[])
             }
         }
 
-        if (qEnvironmentVariableIntValue("KHRONICLE_NO_TRAY_ON_START") != 1) {
+        const bool launchedFromTray =
+            qEnvironmentVariableIntValue("KHRONICLE_LAUNCHED_FROM_TRAY") == 1;
+        const bool trayAlreadyRunning = khronicle::isTrayRunning();
+        if (qEnvironmentVariableIntValue("KHRONICLE_NO_TRAY_ON_START") != 1
+            && !launchedFromTray
+            && !trayAlreadyRunning) {
             KLOG_INFO(QStringLiteral("main"),
                       QStringLiteral("main"),
                       QStringLiteral("auto_start_tray"),

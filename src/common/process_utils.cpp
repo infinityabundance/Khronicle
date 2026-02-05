@@ -128,7 +128,8 @@ bool stopDaemon()
               QString(),
               nlohmann::json::object());
 
-    if (!isDevBuildTree()) {
+    const bool devTree = isDevBuildTree();
+    if (!devTree) {
         const QString systemctl = QStringLiteral("systemctl");
         QStringList args = {QStringLiteral("--user"), QStringLiteral("stop"),
                             QStringLiteral("khronicle-daemon.service")};
@@ -137,7 +138,13 @@ bool stopDaemon()
         }
     }
 
-    // Best-effort fallback: no direct shutdown RPC exists yet.
+    // Dev build fallback: stop the daemon process directly.
+    const QString pkill = QStringLiteral("pkill");
+    QStringList args = {QStringLiteral("-f"), QStringLiteral("khronicle-daemon")};
+    if (QProcess::startDetached(pkill, args)) {
+        return true;
+    }
+
     return false;
 }
 
@@ -186,6 +193,7 @@ bool startUi()
               QString(),
               nlohmann::json::object());
 
+    qputenv("KHRONICLE_LAUNCHED_FROM_TRAY", "1");
     const QString siblingUi = findSiblingBinary(QStringLiteral("khronicle"));
     if (!siblingUi.isEmpty()) {
         if (QProcess::startDetached(siblingUi, {})) {
