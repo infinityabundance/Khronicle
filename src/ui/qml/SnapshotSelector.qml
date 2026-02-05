@@ -9,7 +9,7 @@ Kirigami.Card {
     property var snapshots: []
     property var sortedSnapshots: []
 
-    signal compareRequested(string snapshotAId, string snapshotBId)
+    signal compareRequested(var snapshotA, var snapshotB)
 
     function formatTimestamp(iso) {
         if (!iso) {
@@ -134,7 +134,7 @@ Kirigami.Card {
                     if (!fromSnapshot || !toSnapshot) {
                         return
                     }
-                    root.compareRequested(fromSnapshot.id, toSnapshot.id)
+                    root.compareRequested(fromSnapshot, toSnapshot)
                 }
             }
         }
