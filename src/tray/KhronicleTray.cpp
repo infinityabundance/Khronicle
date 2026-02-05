@@ -53,7 +53,12 @@ KhronicleTray::~KhronicleTray() = default;
 
 void KhronicleTray::setupTrayIcon()
 {
-    m_trayIcon.setIcon(QIcon::fromTheme(QStringLiteral("view-list-details")));
+    const QString iconPath = khronicle::appIconPath();
+    if (!iconPath.isEmpty()) {
+        m_trayIcon.setIcon(QIcon(iconPath));
+    } else {
+        m_trayIcon.setIcon(QIcon::fromTheme(QStringLiteral("view-list-details")));
+    }
     m_trayIcon.setToolTip(QStringLiteral("Khronicle - System change summary"));
 
     connect(&m_trayIcon, &QSystemTrayIcon::activated,
@@ -190,6 +195,10 @@ void KhronicleTray::showAboutDialog()
 {
     QMessageBox box;
     box.setWindowTitle(QStringLiteral("About Khronicle"));
+    const QString iconPath = khronicle::appIconPath();
+    if (!iconPath.isEmpty()) {
+        box.setWindowIcon(QIcon(iconPath));
+    }
     box.setTextFormat(Qt::RichText);
     box.setTextInteractionFlags(Qt::TextBrowserInteraction);
     box.setStandardButtons(QMessageBox::Ok);

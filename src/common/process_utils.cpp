@@ -42,6 +42,28 @@ QString findSiblingBinary(const QString &name)
     return QString();
 }
 
+QString findAssetFile(const QString &name)
+{
+    const QString appDir = QCoreApplication::applicationDirPath();
+    const QStringList relCandidates = {
+        QStringLiteral("assets"),
+        QStringLiteral("../assets"),
+        QStringLiteral("../../assets"),
+        QStringLiteral(".."),
+        QStringLiteral("../.."),
+    };
+
+    for (const QString &relPath : relCandidates) {
+        const QString candidate =
+            QDir(appDir).absoluteFilePath(relPath + QDir::separator() + name);
+        QFileInfo info(candidate);
+        if (info.exists() && info.isFile()) {
+            return info.absoluteFilePath();
+        }
+    }
+    return QString();
+}
+
 bool isDevBuildTree()
 {
     QString dir = QCoreApplication::applicationDirPath();
@@ -202,6 +224,11 @@ bool startUi()
     }
 
     return QProcess::startDetached(QStringLiteral("khronicle"), {});
+}
+
+QString appIconPath()
+{
+    return findAssetFile(QStringLiteral("khronicle-icon.svg"));
 }
 
 } // namespace khronicle

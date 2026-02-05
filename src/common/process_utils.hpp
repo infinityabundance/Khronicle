@@ -12,6 +12,7 @@ bool isTrayRunning();
 bool startTray();
 bool startUi();
 
+QString appIconPath();
 QString daemonSocketPath();
 
 } // namespace khronicle

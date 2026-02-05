@@ -9,6 +9,7 @@ Kirigami.ApplicationWindow {
     width: 1000
     height: 700
     visible: true
+    icon.source: khronicleIconPath
 
     property bool filterKernel: true
     property bool filterGpu: true
@@ -512,6 +513,14 @@ Kirigami.ApplicationWindow {
         height: Kirigami.Units.gridUnit * 14
         contentItem: ColumnLayout {
             spacing: Kirigami.Units.smallSpacing
+            Image {
+                source: khronicleIconPath
+                width: Kirigami.Units.iconSizes.huge
+                height: Kirigami.Units.iconSizes.huge
+                fillMode: Image.PreserveAspectFit
+                visible: source && source.length > 0
+                Layout.alignment: Qt.AlignHCenter
+            }
             Kirigami.Heading { text: "Khronicle" }
             Label {
                 text: "System change chronicle for CachyOS/Arch-like systems."

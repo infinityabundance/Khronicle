@@ -2,6 +2,7 @@
 #include <memory>
 #include <chrono>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
@@ -43,6 +44,11 @@ int main(int argc, char *argv[])
     const bool codexTrace = parser.isSet(codexOption)
         || qEnvironmentVariableIntValue("KHRONICLE_CODEX_TRACE") == 1;
     khronicle::logging::initLogging(QStringLiteral("khronicle"), codexTrace);
+
+    const QString iconPath = khronicle::appIconPath();
+    if (!iconPath.isEmpty()) {
+        app.setWindowIcon(QIcon(iconPath));
+    }
 
     KLOG_INFO(QStringLiteral("main"),
               QStringLiteral("main"),
@@ -98,6 +104,8 @@ int main(int argc, char *argv[])
         fleetModel->loadAggregateFile(parser.value(fleetOption));
         engine.rootContext()->setContextProperty(QStringLiteral("fleetModel"),
                                                  fleetModel.get());
+        engine.rootContext()->setContextProperty(QStringLiteral("khronicleIconPath"),
+                                                 iconPath);
         url = QUrl::fromLocalFile(
             QStringLiteral(KHRONICLE_QML_DIR "/FleetMain.qml"));
     } else {
@@ -111,6 +119,8 @@ int main(int argc, char *argv[])
         daemonController = std::make_unique<khronicle::DaemonController>();
         engine.rootContext()->setContextProperty(QStringLiteral("daemonController"),
                                                  daemonController.get());
+        engine.rootContext()->setContextProperty(QStringLiteral("khronicleIconPath"),
+                                                 iconPath);
         url = QUrl::fromLocalFile(
             QStringLiteral(KHRONICLE_QML_DIR "/Main.qml"));
     }
