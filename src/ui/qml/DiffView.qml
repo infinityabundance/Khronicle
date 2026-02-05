@@ -24,6 +24,7 @@ Kirigami.Card {
     }
 
     contentItem: ColumnLayout {
+        Layout.fillWidth: true
         anchors.margins: Kirigami.Units.largeSpacing
         spacing: Kirigami.Units.smallSpacing
 
@@ -48,19 +49,19 @@ Kirigami.Card {
                 Label {
                     text: "Change"
                     opacity: 0.7
-                    Layout.preferredWidth: parent.width * 0.3
+                    Layout.preferredWidth: root.width * 0.3
                 }
 
                 Label {
                     text: "Before"
                     opacity: 0.7
-                    Layout.preferredWidth: parent.width * 0.35
+                    Layout.preferredWidth: root.width * 0.35
                 }
 
                 Label {
                     text: "After"
                     opacity: 0.7
-                    Layout.preferredWidth: parent.width * 0.35
+                    Layout.preferredWidth: root.width * 0.35
                 }
             }
 
@@ -68,28 +69,29 @@ Kirigami.Card {
                 model: root.diffRows
 
                 delegate: ItemDelegate {
-                    width: parent.width
+                    width: root.width
 
                     contentItem: RowLayout {
                         spacing: Kirigami.Units.largeSpacing
                         anchors.margins: Kirigami.Units.smallSpacing
+                        Layout.fillWidth: true
 
                         Label {
                             text: humanizePath(modelData.path)
                             font.bold: true
-                            Layout.preferredWidth: parent.width * 0.3
+                            Layout.preferredWidth: root.width * 0.3
                             wrapMode: Text.Wrap
                         }
 
                         Label {
                             text: modelData.before || ""
-                            Layout.preferredWidth: parent.width * 0.35
+                            Layout.preferredWidth: root.width * 0.35
                             wrapMode: Text.Wrap
                         }
 
                         Label {
                             text: modelData.after || ""
-                            Layout.preferredWidth: parent.width * 0.35
+                            Layout.preferredWidth: root.width * 0.35
                             wrapMode: Text.Wrap
                         }
                     }
