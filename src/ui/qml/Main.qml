@@ -363,6 +363,8 @@ Kirigami.ApplicationWindow {
         id: aboutDialog
         title: "About Khronicle"
         standardButtons: Kirigami.Dialog.Ok
+        width: Kirigami.Units.gridUnit * 26
+        height: Kirigami.Units.gridUnit * 14
         contentItem: ColumnLayout {
             spacing: Kirigami.Units.smallSpacing
             Kirigami.Heading { text: "Khronicle" }
