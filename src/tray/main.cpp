@@ -1,8 +1,10 @@
 #include <QApplication>
-#include <QSystemTrayIcon>
 #include <QDebug>
+#include <QIcon>
+#include <QSystemTrayIcon>
 
 #include "tray/KhronicleTray.hpp"
+#include "common/process_utils.hpp"
 #include "common/logging.hpp"
 
 #include <nlohmann/json.hpp>
@@ -33,6 +35,11 @@ int main(int argc, char *argv[])
               khronicle::logging::defaultWho(),
               QString(),
               nlohmann::json::object());
+
+    const QString iconPath = khronicle::appIconPath();
+    if (!iconPath.isEmpty()) {
+        app.setWindowIcon(QIcon(iconPath));
+    }
 
     // Tray runs as a background UI with periodic daemon queries.
     KhronicleTray tray;
