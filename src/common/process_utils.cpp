@@ -19,11 +19,45 @@ namespace {
 QString findSiblingBinary(const QString &name)
 {
     const QString appDir = QCoreApplication::applicationDirPath();
-    const QString siblingPath = appDir + QDir::separator() + name;
-    if (QFileInfo::exists(siblingPath)) {
-        return siblingPath;
+    const QStringList relCandidates = {
+        QStringLiteral("."),
+        QStringLiteral(".."),
+        QStringLiteral("../.."),
+        QStringLiteral("../src/daemon"),
+        QStringLiteral("../src/tray"),
+        QStringLiteral("../../src/daemon"),
+        QStringLiteral("../../src/tray"),
+        QStringLiteral("../bin"),
+        QStringLiteral("../../bin"),
+    };
+
+    for (const QString &relPath : relCandidates) {
+        const QString candidate =
+            QDir(appDir).absoluteFilePath(relPath + QDir::separator() + name);
+        QFileInfo info(candidate);
+        if (info.exists() && info.isExecutable()) {
+            return info.absoluteFilePath();
+        }
     }
     return QString();
+}
+
+bool isDevBuildTree()
+{
+    QString dir = QCoreApplication::applicationDirPath();
+    for (int i = 0; i < 4; ++i) {
+        const QString cachePath =
+            QDir(dir).absoluteFilePath(QStringLiteral("CMakeCache.txt"));
+        if (QFileInfo::exists(cachePath)) {
+            return true;
+        }
+        QDir parent(dir);
+        if (!parent.cdUp()) {
+            break;
+        }
+        dir = parent.absolutePath();
+    }
+    return false;
 }
 
 } // namespace
@@ -67,12 +101,16 @@ bool startDaemon()
         }
     }
 
+    const bool devTree = isDevBuildTree();
+
     // Try systemctl (for installed systems)
-    const QString systemctl = QStringLiteral("systemctl");
-    QStringList args = {QStringLiteral("--user"), QStringLiteral("start"),
-                        QStringLiteral("khronicle-daemon.service")};
-    if (QProcess::startDetached(systemctl, args)) {
-        return true;
+    if (!devTree) {
+        const QString systemctl = QStringLiteral("systemctl");
+        QStringList args = {QStringLiteral("--user"), QStringLiteral("start"),
+                            QStringLiteral("khronicle-daemon.service")};
+        if (QProcess::startDetached(systemctl, args)) {
+            return true;
+        }
     }
 
     // Fall back to PATH lookup
@@ -90,11 +128,13 @@ bool stopDaemon()
               QString(),
               nlohmann::json::object());
 
-    const QString systemctl = QStringLiteral("systemctl");
-    QStringList args = {QStringLiteral("--user"), QStringLiteral("stop"),
-                        QStringLiteral("khronicle-daemon.service")};
-    if (QProcess::startDetached(systemctl, args)) {
-        return true;
+    if (!isDevBuildTree()) {
+        const QString systemctl = QStringLiteral("systemctl");
+        QStringList args = {QStringLiteral("--user"), QStringLiteral("stop"),
+                            QStringLiteral("khronicle-daemon.service")};
+        if (QProcess::startDetached(systemctl, args)) {
+            return true;
+        }
     }
 
     // Best-effort fallback: no direct shutdown RPC exists yet.
