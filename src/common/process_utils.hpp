@@ -10,6 +10,7 @@ bool stopDaemon();
 
 bool isTrayRunning();
 bool startTray();
+bool startUi();
 
 QString daemonSocketPath();
 

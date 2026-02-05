@@ -183,7 +183,7 @@ void KhronicleTray::openFullApp()
               khronicle::logging::defaultWho(),
               QString(),
               nlohmann::json::object());
-    QProcess::startDetached(QStringLiteral("khronicle"));
+    khronicle::startUi();
 }
 
 void KhronicleTray::showAboutDialog()

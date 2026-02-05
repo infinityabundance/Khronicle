@@ -175,4 +175,25 @@ bool startTray()
     return QProcess::startDetached(QStringLiteral("khronicle-tray"), {});
 }
 
+bool startUi()
+{
+    KLOG_INFO(QStringLiteral("ProcessUtils"),
+              QStringLiteral("startUi"),
+              QStringLiteral("start_ui"),
+              QStringLiteral("user_action"),
+              QStringLiteral("process_start"),
+              khronicle::logging::defaultWho(),
+              QString(),
+              nlohmann::json::object());
+
+    const QString siblingUi = findSiblingBinary(QStringLiteral("khronicle"));
+    if (!siblingUi.isEmpty()) {
+        if (QProcess::startDetached(siblingUi, {})) {
+            return true;
+        }
+    }
+
+    return QProcess::startDetached(QStringLiteral("khronicle"), {});
+}
+
 } // namespace khronicle
