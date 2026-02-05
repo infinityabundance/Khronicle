@@ -6,6 +6,7 @@ import org.kde.kirigami as Kirigami
 Item {
     id: root
     property var events: []
+    signal eventClicked(var eventData)
 
     Kirigami.PlaceholderMessage {
         anchors.centerIn: parent
@@ -25,6 +26,10 @@ Item {
         delegate: EventCard {
             width: listView.width
             eventData: modelData
+            onClicked: {
+                listView.currentIndex = index
+                root.eventClicked(eventData)
+            }
         }
     }
 }

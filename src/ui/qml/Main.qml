@@ -27,6 +27,8 @@ Kirigami.ApplicationWindow {
     property string explanationText: ""
     property bool demoMode: false
     property bool apiConnected: false
+    property var compareFromDate: null
+    property var compareToDate: null
 
     function applyFilters() {
         if (!root.rawEventsModel) {
@@ -448,13 +450,21 @@ Kirigami.ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 events: root.eventsModel
+                onEventClicked: function(eventData) {
+                    // Avoid click-through to controls below and allow future event actions.
+                }
             }
 
             SnapshotSelector {
                 Layout.fillWidth: true
                 snapshots: root.snapshotsModel
-                onCompareRequested: function(snapshotAId, snapshotBId) {
-                    khronicleApi.loadDiff(snapshotAId, snapshotBId)
+                onCompareRequested: function(snapshotA, snapshotB) {
+                    if (!snapshotA || !snapshotB) {
+                        return
+                    }
+                    khronicleApi.loadDiff(snapshotA.id, snapshotB.id)
+                    compareFromDate = new Date(snapshotA.timestamp)
+                    compareToDate = new Date(snapshotB.timestamp)
                 }
             }
 
@@ -467,8 +477,15 @@ Kirigami.ApplicationWindow {
                     enabled: root.currentFromDate !== null && root.currentToDate !== null
                     onClicked: {
                         root.explanationText = ""
-                        khronicleApi.loadExplanationBetween(root.currentFromDate,
-                                                           root.currentToDate)
+                        if (root.compareFromDate && root.compareToDate) {
+                            khronicleApi.loadExplanationBetween(root.compareFromDate,
+                                                               root.compareToDate)
+                        } else if (root.currentFromDate && root.currentToDate) {
+                            khronicleApi.loadExplanationBetween(root.currentFromDate,
+                                                               root.currentToDate)
+                        } else {
+                            root.explanationText = "Select a range or compare snapshots first."
+                        }
                     }
                 }
 

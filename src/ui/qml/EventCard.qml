@@ -6,6 +6,7 @@ import org.kde.kirigami as Kirigami
 ItemDelegate {
     id: root
     property var eventData: ({})
+    signal clicked(var eventData)
 
     function timePart(iso) {
         if (!iso) {
@@ -82,5 +83,9 @@ ItemDelegate {
                 }
             }
         }
+    }
+
+    onClicked: {
+        root.clicked(root.eventData)
     }
 }
