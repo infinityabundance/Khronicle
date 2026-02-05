@@ -9,7 +9,6 @@ Kirigami.ApplicationWindow {
     width: 1100
     height: 700
     visible: true
-    icon.source: khronicleIconPath
 
     property var comparisonRows: []
     property string compareHostA: ""

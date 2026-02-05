@@ -9,7 +9,6 @@ Kirigami.ApplicationWindow {
     width: 1000
     height: 700
     visible: true
-    icon.source: khronicleIconPath
 
     property bool filterKernel: true
     property bool filterGpu: true
