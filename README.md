@@ -1,6 +1,7 @@
 # Khronicle
 
-[![Khronicle logo](assets/khronicle-icon.svg)](https://github.com/infinityabundance/Khronicle)
+[<img src="assets/khronicle-icon.svg" width="600" alt="Khronicle logo">](https://github.com/infinityabundance/Khronicle)
+
 
 
 Khronicle is a local, auditable system change chronicle for KDE Plasma on
