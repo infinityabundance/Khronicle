@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
             const auto start = std::chrono::steady_clock::now();
             while (!khronicle::isDaemonRunning()) {
                 if (std::chrono::steady_clock::now() - start
-                    > std::chrono::seconds(1)) {
+                    > std::chrono::seconds(5)) {
                     break;
                 }
                 QThread::msleep(100);
@@ -85,7 +85,8 @@ int main(int argc, char *argv[])
         const bool trayAlreadyRunning = khronicle::isTrayRunning();
         if (qEnvironmentVariableIntValue("KHRONICLE_NO_TRAY_ON_START") != 1
             && !launchedFromTray
-            && !trayAlreadyRunning) {
+            && !trayAlreadyRunning
+            && khronicle::isDaemonRunning()) {
             KLOG_INFO(QStringLiteral("main"),
                       QStringLiteral("main"),
                       QStringLiteral("auto_start_tray"),
