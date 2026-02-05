@@ -11,6 +11,39 @@ Kirigami.Card {
 
     signal compareRequested(var snapshotA, var snapshotB)
 
+    function selectForTimestamp(iso) {
+        if (!iso || !root.sortedSnapshots || root.sortedSnapshots.length === 0) {
+            return
+        }
+        const target = new Date(iso)
+        if (isNaN(target.getTime())) {
+            return
+        }
+
+        var closestIndex = 0
+        var closestDelta = Math.abs(new Date(root.sortedSnapshots[0].timestamp).getTime()
+            - target.getTime())
+
+        for (var i = 1; i < root.sortedSnapshots.length; ++i) {
+            const snapTime = new Date(root.sortedSnapshots[i].timestamp)
+            if (isNaN(snapTime.getTime())) {
+                continue
+            }
+            const delta = Math.abs(snapTime.getTime() - target.getTime())
+            if (delta < closestDelta) {
+                closestDelta = delta
+                closestIndex = i
+            }
+        }
+
+        compareFrom.currentIndex = closestIndex
+        compareTo.currentIndex = 0
+        if (compareTo.currentIndex === compareFrom.currentIndex
+            && root.sortedSnapshots.length > 1) {
+            compareTo.currentIndex = 1
+        }
+    }
+
     function formatTimestamp(iso) {
         if (!iso) {
             return ""

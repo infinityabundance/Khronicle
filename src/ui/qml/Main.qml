@@ -451,11 +451,14 @@ Kirigami.ApplicationWindow {
                 Layout.fillHeight: true
                 events: root.eventsModel
                 onEventClicked: function(eventData) {
-                    // Avoid click-through to controls below and allow future event actions.
+                    if (snapshotSelector) {
+                        snapshotSelector.selectForTimestamp(eventData.timestamp)
+                    }
                 }
             }
 
             SnapshotSelector {
+                id: snapshotSelector
                 Layout.fillWidth: true
                 snapshots: root.snapshotsModel
                 onCompareRequested: function(snapshotA, snapshotB) {
