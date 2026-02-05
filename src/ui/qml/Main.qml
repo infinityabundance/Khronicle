@@ -26,6 +26,7 @@ Kirigami.ApplicationWindow {
     property var diffModel: []
     property string explanationText: ""
     property bool demoMode: false
+    property bool apiConnected: false
 
     function applyFilters() {
         if (!root.rawEventsModel) {
@@ -105,7 +106,7 @@ Kirigami.ApplicationWindow {
 
         if (root.demoMode) {
             root.applyFilters()
-        } else {
+        } else if (root.apiConnected) {
             khronicleApi.loadChangesBetween(from, to)
             khronicleApi.loadSummarySince(from)
         }
@@ -231,12 +232,18 @@ Kirigami.ApplicationWindow {
         selectDateRange("week")
         if (!root.demoMode) {
             khronicleApi.connectToDaemon()
-            khronicleApi.loadSnapshots()
         }
     }
 
     Connections {
         target: khronicleApi
+        function onConnectedChanged(connected) {
+            root.apiConnected = connected
+            if (connected && !root.demoMode) {
+                selectDateRange(root.currentRange)
+                khronicleApi.loadSnapshots()
+            }
+        }
         function onSummaryLoaded(summary) {
             root.summaryData = summary
         }

@@ -141,7 +141,13 @@ void KhronicleApiServer::handleClientReadyRead()
         return;
     }
 
-    handleRequest(socket, payload);
+    const QList<QByteArray> lines = payload.split('\n');
+    for (const QByteArray &line : lines) {
+        if (line.trimmed().isEmpty()) {
+            continue;
+        }
+        handleRequest(socket, line);
+    }
 }
 
 void KhronicleApiServer::handleRequest(QLocalSocket *socket,
@@ -152,8 +158,8 @@ void KhronicleApiServer::handleRequest(QLocalSocket *socket,
     }
     const QByteArray response = handleRequestPayload(payload);
     socket->write(response);
+    socket->write("\n");
     socket->flush();
-    socket->disconnectFromServer();
 }
 
 QByteArray KhronicleApiServer::handleRequestPayload(const QByteArray &payload)
