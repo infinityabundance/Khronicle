@@ -200,33 +200,6 @@ EventCategory categoryForPackage(const std::string &packageName)
     return EventCategory::Package;
 }
 
-bool isInterestingPackage(const std::string &packageName)
-{
-    // Explicit list keeps ingestion focused on kernel/GPU/firmware changes.
-    // Explicit list of interesting packages for now (kernels, GPU drivers, firmware).
-    static const std::unordered_set<std::string> interesting{
-        "linux",
-        "linux-cachyos",
-        "linux-zen",
-        "linux-lts",
-        "mesa",
-        "mesa-git",
-        "nvidia",
-        "nvidia-dkms",
-        "nvidia-utils",
-        "vulkan-radeon",
-        "vulkan-intel",
-        "vulkan-nouveau",
-        "xf86-video-amdgpu",
-        "xf86-video-intel",
-        "linux-firmware",
-        "amd-ucode",
-        "intel-ucode",
-    };
-
-    return interesting.contains(packageName);
-}
-
 } // namespace
 
 PacmanParseResult parsePacmanLog(const std::string &path,
@@ -268,10 +241,6 @@ PacmanParseResult parsePacmanLog(const std::string &path,
     while (std::getline(file, line)) {
         auto parsed = parseLine(line);
         if (!parsed.has_value()) {
-            continue;
-        }
-
-        if (!isInterestingPackage(parsed->packageName)) {
             continue;
         }
 
