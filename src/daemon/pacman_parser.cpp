@@ -10,6 +10,9 @@
 #include <string>
 #include <unordered_set>
 
+#include <QDateTime>
+#include <QRegularExpression>
+
 #include <nlohmann/json.hpp>
 
 #include "common/logging.hpp"
@@ -34,15 +37,41 @@ std::streampos parseCursor(const std::optional<std::string> &cursor)
     }
 }
 
-// Assumes pacman.log timestamps are local time, formatted as YYYY-MM-DD[T ]HH:MM.
+// Handles pacman.log timestamps like:
+// - YYYY-MM-DD HH:MM
+// - YYYY-MM-DD HH:MM:SS
+// - YYYY-MM-DDTHH:MM:SS+0000
 std::optional<std::chrono::system_clock::time_point> parseTimestamp(
     const std::string &raw)
 {
-    std::string normalized = raw;
-    std::replace(normalized.begin(), normalized.end(), 'T', ' ');
+    QString normalized = QString::fromStdString(raw).trimmed();
+    normalized.replace(' ', 'T');
+
+    const int tzIndex = normalized.indexOf(QRegularExpression("[+-]\\d{4}$"));
+    if (tzIndex >= 0) {
+        // Insert colon into timezone offset: +0000 -> +00:00
+        normalized.insert(tzIndex + 3, QLatin1Char(':'));
+    }
+
+    if (normalized.indexOf(QRegularExpression("T\\d{2}:\\d{2}:\\d{2}")) < 0) {
+        normalized.insert(16, QStringLiteral(":00"));
+    }
+
+    QDateTime dt = QDateTime::fromString(normalized, Qt::ISODate);
+    if (dt.isValid()) {
+        if (dt.timeSpec() == Qt::LocalTime) {
+            return std::chrono::system_clock::from_time_t(dt.toSecsSinceEpoch());
+        }
+        return std::chrono::system_clock::time_point{
+            std::chrono::milliseconds{dt.toMSecsSinceEpoch()}};
+    }
+
+    // Fallback: treat as local time with minutes precision.
+    std::string fallback = raw;
+    std::replace(fallback.begin(), fallback.end(), 'T', ' ');
 
     std::tm tm{};
-    std::istringstream stream(normalized);
+    std::istringstream stream(fallback);
     stream >> std::get_time(&tm, "%Y-%m-%d %H:%M");
     if (stream.fail()) {
         return std::nullopt;
@@ -82,7 +111,7 @@ std::optional<ParsedLine> parseLine(const std::string &line)
 {
     // Pacman log lines are structured; we only care about install/upgrade/downgrade.
     static const std::regex pattern(
-        R"(^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2})\]\s+\[ALPM\]\s+)"
+        R"(^\[(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:[+-]\d{4})?)\]\s+\[ALPM\]\s+)"
         R"((installed|upgraded|downgraded)\s+([^\s]+)\s+\(([^\)]*)\))");
 
     std::smatch match;

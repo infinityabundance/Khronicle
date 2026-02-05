@@ -25,6 +25,7 @@ Kirigami.ApplicationWindow {
     property var snapshotsModel: []
     property var diffModel: []
     property string explanationText: ""
+    property bool demoMode: false
 
     function applyFilters() {
         if (!root.rawEventsModel) {
@@ -48,6 +49,15 @@ Kirigami.ApplicationWindow {
                 keep = true
             } else if (cat === "system") {
                 keep = true
+            }
+
+            if (keep && root.demoMode && root.currentFromDate && root.currentToDate) {
+                const evDate = new Date(ev.timestamp || "")
+                if (isNaN(evDate.getTime())
+                    || evDate < root.currentFromDate
+                    || evDate > root.currentToDate) {
+                    keep = false
+                }
             }
 
             if (keep) {
@@ -93,8 +103,12 @@ Kirigami.ApplicationWindow {
         root.currentFromDate = from
         root.currentToDate = to
 
-        khronicleApi.loadChangesBetween(from, to)
-        khronicleApi.loadSummarySince(from)
+        if (root.demoMode) {
+            root.applyFilters()
+        } else {
+            khronicleApi.loadChangesBetween(from, to)
+            khronicleApi.loadSummarySince(from)
+        }
     }
 
     function buildRangeLabel() {
@@ -112,10 +126,113 @@ Kirigami.ApplicationWindow {
         return formatDate(root.currentFromDate) + " → " + formatDate(root.currentToDate)
     }
 
-    Component.onCompleted: {
+    function setDemoMode(enabled) {
+        if (root.demoMode === enabled) {
+            return
+        }
+        root.demoMode = enabled
+        if (enabled) {
+            loadDemoData()
+        } else {
+            loadLiveData()
+        }
+    }
+
+    function loadDemoData() {
+        const now = new Date()
+        function isoHoursAgo(hours) {
+            return new Date(now.getTime() - hours * 60 * 60 * 1000).toISOString()
+        }
+
+        root.summaryData = {
+            kernelChanged: true,
+            kernelFrom: "6.7.4-arch1-1",
+            kernelTo: "6.7.9-arch1-1",
+            gpuEvents: 2,
+            firmwareEvents: 1,
+            totalEvents: 6
+        }
+
+        root.rawEventsModel = [
+            {
+                timestamp: isoHoursAgo(2),
+                category: "kernel",
+                summary: "Kernel upgraded 6.7.4 → 6.7.9",
+                details: "pacman: upgraded linux"
+            },
+            {
+                timestamp: isoHoursAgo(6),
+                category: "package",
+                summary: "upgraded mesa 24.0.1 → 24.0.2",
+                details: "pacman: upgraded mesa"
+            },
+            {
+                timestamp: isoHoursAgo(10),
+                category: "gpu_driver",
+                summary: "NVIDIA driver version loaded",
+                details: "kernel: nvidia 550.54 loaded"
+            },
+            {
+                timestamp: isoHoursAgo(18),
+                category: "firmware",
+                summary: "Firmware updated via fwupd",
+                details: "fwupd: DemoDevice 1.2.3"
+            },
+            {
+                timestamp: isoHoursAgo(26),
+                category: "package",
+                summary: "installed demo-pkg 1.0-1",
+                details: "pacman: installed demo-pkg"
+            },
+            {
+                timestamp: isoHoursAgo(30),
+                category: "system",
+                summary: "Snapshot captured",
+                details: "auto snapshot check"
+            }
+        ]
+        root.applyFilters()
+
+        root.snapshotsModel = [
+            {
+                id: "snap-1",
+                timestamp: isoHoursAgo(26),
+                kernelVersion: "6.7.4-arch1-1"
+            },
+            {
+                id: "snap-2",
+                timestamp: isoHoursAgo(2),
+                kernelVersion: "6.7.9-arch1-1"
+            }
+        ]
+
+        root.diffModel = [
+            { path: "kernelVersion", before: "6.7.4-arch1-1", after: "6.7.9-arch1-1" },
+            { path: "keyPackages.mesa", before: "24.0.1", after: "24.0.2" },
+            { path: "firmwareVersions.DemoDevice", before: "1.2.2", after: "1.2.3" }
+        ]
+
+        root.explanationText = "Demo explanation: kernel and GPU packages updated."
+    }
+
+    function loadLiveData() {
+        root.summaryData = ({})
+        root.rawEventsModel = []
+        root.eventsModel = []
+        root.snapshotsModel = []
+        root.diffModel = []
+        root.explanationText = ""
         khronicleApi.connectToDaemon()
-        selectDateRange("week")
+        selectDateRange(root.currentRange)
         khronicleApi.loadSnapshots()
+    }
+
+    Component.onCompleted: {
+        selectDateRange("week")
+        if (!root.demoMode) {
+            khronicleApi.connectToDaemon()
+            khronicleApi.loadSnapshots()
+        }
     }
 
     Connections {
@@ -137,7 +254,9 @@ Kirigami.ApplicationWindow {
             root.explanationText = summary
         }
         function onErrorOccurred(message) {
-            console.warn("Khronicle API error:", message)
+            if (!root.demoMode) {
+                console.warn("Khronicle API error:", message)
+            }
         }
     }
 
@@ -161,7 +280,9 @@ Kirigami.ApplicationWindow {
             },
             Kirigami.Action {
                 text: "Watchpoints"
-                onTriggered: root.pageStack.replace(watchpointsPageComponent)
+                onTriggered: root.pageStack.replace(
+                                 root.demoMode ? watchpointsDemoComponent
+                                               : watchpointsPageComponent)
             },
             Kirigami.Action {
                 text: "About"
@@ -182,12 +303,6 @@ Kirigami.ApplicationWindow {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: Kirigami.Units.smallSpacing
-
-                Label {
-                    text: daemonController && daemonController.daemonRunning
-                        ? "Daemon: Running"
-                        : "Daemon: Stopped"
-                }
 
                 Button {
                     text: daemonController && daemonController.daemonRunning
@@ -214,7 +329,20 @@ Kirigami.ApplicationWindow {
                     }
                 }
 
+                Switch {
+                    text: "Demo data"
+                    checked: root.demoMode
+                    onToggled: root.setDemoMode(checked)
+                }
+
                 Item { Layout.fillWidth: true }
+
+                Label {
+                    text: daemonController && daemonController.daemonRunning
+                        ? "Daemon: Running"
+                        : "Daemon: Stopped"
+                    opacity: 0.7
+                }
             }
 
             SummaryBar {
@@ -357,6 +485,23 @@ Kirigami.ApplicationWindow {
     Component {
         id: watchpointsPageComponent
         WatchpointsPage { }
+    }
+
+    Component {
+        id: watchpointsDemoComponent
+        Kirigami.Page {
+            title: "Watchpoints"
+
+            ColumnLayout {
+                anchors.fill: parent
+                spacing: Kirigami.Units.largeSpacing
+
+                Kirigami.PlaceholderMessage {
+                    Layout.fillWidth: true
+                    text: "Watchpoints are disabled while demo data is enabled."
+                }
+            }
+        }
     }
 
     Kirigami.Dialog {
