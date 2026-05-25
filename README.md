@@ -3,6 +3,7 @@
 [<img src="assets/khronicle-icon.svg" width="400" alt="Khronicle logo">](https://github.com/infinityabundance/Khronicle)
 
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/infinityabundance/Khronicle)
 
 Khronicle is a local, auditable system change chronicle for KDE Plasma on
 CachyOS/Arch-based systems. It records kernel, driver, firmware, and key package
